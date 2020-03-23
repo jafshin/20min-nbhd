@@ -1,0 +1,574 @@
+---
+title: "Achieving 20 Minute Neighbourhood: Optimisation results"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: scroll
+runtime: shiny
+---
+
+```{r global, include=FALSE}
+library(flexdashboard)
+library(shiny)
+library(datasets)
+library(sf)
+library(dplyr)
+library(plotly)
+library(DT)
+```
+
+
+Model assumptions and inputs
+======================================================================
+
+Colmun {data-width=550}
+-----------------------------------------------------------------------
+
+### **Optimisation model brief description**
+
+#### Model overview
+
+This dashboard presents an overview of results from our optimisation model for achieving 20 minutes neighbourhood. 
+The model uses an evolutionary algorithm to search for the optimum layout and number of destinations so that 95% of the population will have access to destinations within 20 minutes of walking. List of destinations and their 20 minutes walking buffer is available in `table 1`.
+
+#### Population distribution process
+
+In this model, the total population is considered constant and equal to 30,000 people. By this assumption, only level 1 and 2 neighbourhoods are considered. Size of the neighbourhoods is also considered as constant. Neighbourhoods are considered as squares with 0.8 km length each (blue squares in `figure 1`). To do the distance calculation and also to distribute the population, each neighbourhood is divided into 16 small squares (pixels) with 0.2 km length each (green squares in `figure 1`). At this stage, the population is considered to be distributed homogeneously throughout the pixels. 
+
+Assuming 2.6 person per households, and considering households as an approximation for dwellings, once the user selects the value of dwelling density per hectare, the model calculates the number of neighbourhoods, number of pixels and average population per pixel and will distribute the population based on these values. 
+
+#### Destination allocation decision-making process
+
+The list of the destinations that are considered in the model is presented in `table 1`. Note that some of these destinations are not considered in this version of the model. These destinations and the reason for excluding them is also mentioned in `table 1` (column Note). 
+As one of the optimisations constraint, the population requirement for each destination type is considered as its serving capacity. Meaning if a destination of type *i*, *D~i~*, has population requirement of 8000 people, we assume that a single *D~i~* can only serve 8000 people and if the population is equal to 10000, then at least two *D~i~* will be added.
+Furthermore, the co-location of destinations of the same category is not considered. Therefore, destinations like *Youth space* or *Community art space* that will be located within *Multi-purpose community centre*, are excluded. 
+
+As illustrated in `figure 2`, several pre-defined decision points are considered for adding new destinations. Once a new destination is decided to be added based on population requirements, it will search these decision points to find the one with the highest potential population coverage. 
+
+#### Evolutionary process and optimisation scoring
+
+At each iteration, if a feasible solution is found, model assigns a score to the solution. Score of each iteration is calculated as:
+
+
+$$\sum_{i=1}^{I}(\frac{FC_i}{N_{i}*C_{i}}+1)*N_{i}*(-1)*w_i $$
+
+where $I$ is a set of all inlcuded destinations, $N_i$ is number of open destination $i$, $FC_i$ is free capacity of destination $i$, $C_i$ is the capacity of a single destination $i$ and therefore $N_{i}*C_{i}$ indicates total population capacity created by open desintations of type $i$. Furthermore, to include some apsect of different costs for opening different types of destinations, $w_i$ is included which is equal to:
+
+$$\frac{C_i}{\sum_{j=1}^{I}C_j}$$
+
+If the calculated score of iteration $p$ is greater that best recorded score to that point, solution of iteration $p$ and its score will be recorded as the new best solution. 
+
+#### Key limitations and possible improvements
+
+There are several assumptions made in this version of the model. These assumptions are primary made to have a working model that is clear enough for us to intrepret the results. In the next steps, each of these assumptions can be resolved, considering their cost vs benefit. Some of these assumptions are:
+
+- Homogenous population distribution;
+- Considering all destinations will be on the land (no multi-level facility);
+- No co-location of destinations from same category;
+- No higher level replacement (e.g. a district park in a neighbourhood can eliminate need for small local parks);
+- Pixel and centroid assumptions for population distribution and distance calculation;
+- Eucelidean distance is considered instead of road-network distance;
+- No higher level urban system is considered, only 30,000 people in a remote location (i.e. a very remote greenfield case), whereas in most real-world scenarios, neighbourhoods are already surrounded with other neighbourhoods around them;
+
+
+Colmun {.tabset data-width=450}
+-----------------------------------------------------------------------
+
+### **Figure 1. Neighbourhood grid**
+
+ ![](grid_plain.png){#id .class width=50% height=50%}
+
+
+
+### **Figure 2. Neighbourhood grid**
+
+![](grid_points.png){#id .class width=50% height=50%}
+
+
+### **Table 1. Destinations and their attributes**
+
+```{r}
+df_destinations <- read.csv("./inputs/destinations_HLC.csv")
+
+df_destinations_to_show <-  read.csv("./inputs/destinations_HLC_For_Dashboard.csv")
+
+df_destinations_to_show <- df_destinations_to_show %>%
+                      dplyr::select("ID" = id, "Name" = name, "Category" = category, "Land requirement (sq.km)" = land_req_sqkm, "Provision/Population" = pop_req, "Service specific buffer (km)" =  dist_in_20_min, Note)
+
+datatable(df_destinations_to_show, extensions = 'Buttons',
+            options = list(
+              dom = 'Blfrtip',
+              buttons = c('copy','csv','excel','pdf','print'),
+              scrollY = 600,
+              scroller = TRUE,
+              lengthMenu = list(c(10,25,50,-1), c(10,25,50, "All"))
+              )
+          )
+
+```
+
+
+Overall results
+======================================================================
+
+Column {.sidebar}
+-----------------------------------------------------------------------
+
+### Page overview:
+
+This page includes optimisation results for all destinations for different dwelling density.Results in this page are based on the selected dwelling density. You can change the density using this slider:
+
+```{r}
+sliderInput("dwelling_density", label = "Dwelling Density:",
+            min= 15, max = 55, value = 25, step = 2.5)
+
+```
+
+`Figure 3` shows population (green pixels), neighbourhoods with population (green circles) and destination (orange circles) distribution on the grid network for different level of dwelling density. The size of destination circles in `figure 3` indicates number of destinations in that location and the amount of land occupied by them. Population distribution and destination selection points are as illustrated in `figure 1 and 2`. `Figure 4` shows how optimisation score changes by increasing dwelling density. List of destinations that the model decided to open and some of their details are available in `table 2`.
+
+
+
+```{r}
+input_dir <- "./outputs/RUN25_ToServer/"
+decisions <- read.csv(paste(input_dir, "combined_decision.csv", sep = ""))
+nbhds <- read.csv(paste(input_dir, "combined_nbhds.csv", sep = ""))
+pxls <- read.csv(paste(input_dir, "combined_pxls.csv", sep = ""))
+
+
+
+for(dec in 1:nrow(decisions)){
+  decisions$name[dec] <- df_destinations$name[which(df_destinations$dest_type_id == decisions$dest_type_id[dec])] %>%
+    as.character()
+  decisions$land_req[dec] <- df_destinations$land_req_sqkm[which(df_destinations$dest_type_id == decisions$dest_type_id[dec])]
+}
+
+
+df_deci <- reactive({
+    decisions %>% 
+      filter(density == input$dwelling_density)
+})
+
+df_nbhd <- reactive({
+  nbhds %>% 
+    filter(density == input$dwelling_density)
+})
+
+df_pxl <- reactive({
+  pxls %>% 
+    filter(density == input$dwelling_density)
+})
+
+
+```
+
+Colmun
+-----------------------------------------------------------------------
+
+### **Figure 3: Neighbourhoods and destinations distribution**
+
+```{r}
+#
+
+renderPlotly({
+  #deci_file <- paste(input_dir, "output_decision_D15.csv", sep = "")
+
+  #nbhd_file <- paste(input_dir, "init_nbhd_D15.csv", sep = "")
+  
+  #df_deci <- read.csv(deci_file)
+  
+  df_deci_this <- st_as_sf(df_deci(), coords = c("x", "y"))
+  
+  df_nbhd_this <- st_as_sf(df_nbhd(), coords = c("x", "y"))
+
+  df_pxl_this <- st_as_sf(df_pxl(), coords = c("x", "y"))
+  
+  df_deci_this <- df_deci_this %>%
+    filter(num_open >0 ) %>%
+    select(loc_id,dest_type_id, name, num_open, land_req, geometry) %>%
+    group_by(loc_id) %>%
+    summarise(Destinations = paste(name, " = ", num_open, sep = "", collapse = "\n"), 
+              num_open_t = sum(num_open), 
+              land = sum(num_open*land_req))
+    #mutate()
+  
+  
+  df_deci_this <- df_deci_this %>%
+    mutate(radius = (land/max(land))*0.2)
+  
+  df_deci_buffered <- df_deci_this %>% st_buffer(ifelse(df_deci_this$radius > 0.03,df_deci_this$radius, 0.03) )
+  df_nbhd_buffered <- st_buffer(df_nbhd_this, 0.4) %>%
+                        mutate(Population = pop) %>%
+                        mutate(HasPopulation = ifelse(pop > 0 , "Neighbourhood with population", "Empty neighbourhood"))
+  
+  # Square from centroids:
+  for(i in 1:nrow(df_pxl_this)){
+    pxl_centre <- st_geometry(df_pxl_this)[i]
+    top_right <- pxl_centre + c( 0.1, 0.1)
+    top_left <- pxl_centre + c(-0.1 , 0.1)
+    buttom_right <- pxl_centre + c(0.1, -0.1)
+    bottom_left <- pxl_centre + c(-0.1, -0.1)
+    df_pxl_this$geometry[i] <- st_convex_hull(st_combine(c(top_left, top_right, bottom_left, buttom_right)))
+  }
+  
+  
+  df_pxl_buffered <- df_pxl_this %>%
+                        mutate(HasPopulation = ifelse(pop > 0 , "Neighbourhood with population", "Empty neighbourhood"))
+  
+  
+    q <- ggplot() +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          legend.position = "none",
+          plot.title = element_text(family = "Helvetica", face = "bold", size = (12)))  +
+    geom_sf(data = df_pxl_buffered, alpha = 0.8, aes(fill = HasPopulation, colour = HasPopulation)) +
+    scale_colour_manual(values = c("gray22", "gray22")) +
+    scale_fill_manual(values = c("gray77", "aquamarine3"), guide = FALSE) + 
+    geom_vline(xintercept=c(-2,-1.2,-0.4,0.4,1.2,2), color="#0072B2", size=0.5) +
+    geom_hline(yintercept=c(-2,-1.2,-0.4,0.4,1.2,2), color="#0072B2", size=0.5) +
+    geom_vline(xintercept=c(-1.8,-1.6,-1.4,-1.0,-0.8,-0.6,-0.2,0,0.2,0.6,0.8,1.0,1.4,1.6,1.8), color="#009E73", size=0.3, linetype="dotted") +
+    geom_hline(yintercept=c(-1.8,-1.6,-1.4,-1.0,-0.8,-0.6,-0.2,0,0.2,0.6,0.8,1.0,1.4,1.6,1.8), color="#009E73", size=0.3, linetype="dotted") +
+    geom_sf(data = df_deci_buffered, color = "sienna4", fill = "sienna2", aes(label = Destinations))
+   
+  q %>% ggplotly(tooltip = c("label"))   
+  #q %>% ggplotly(tooltip = "text") %>% style(hoveron = "fill")
+  
+})
+
+```
+
+
+### **Figure 4: Score vs dwelling density**
+
+```{r}
+
+scores <- read.csv(paste(input_dir, "score_summary.csv", sep = ""))
+
+q <- ggplot(scores, aes(x = density, y = score)) + geom_line() + geom_point(aes(text = paste('Score:\n', score)))
+
+q %>% ggplotly(tooltip = "text")
+
+```
+
+Column
+-----------------------------------------------------------------------
+
+### Total number of open destinations
+
+```{r}
+renderValueBox({
+  num_open_total <- df_deci() %>% group_by(density) %>% summarise( total_open = sum(num_open)) %>% select(total_open) %>% unlist()
+  valueBox(num_open_total,
+           icon = 'fa-city',
+           href='#section-destination-specific-results')
+  
+})
+
+```
+
+### Percentage of free capacity
+
+```{r}
+renderGauge({
+    pct_free_cap <- df_deci() %>% 
+                        group_by(density) %>%
+                        summarise( total_capacity = sum(total_pop_cap), unused_capacity = sum(remaining_pop_cap)) %>%
+                        mutate(pct_free = 100*unused_capacity/total_capacity) %>%
+                        select(pct_free) %>%
+                        unlist() %>%
+                        as.double() %>%
+                        round(2)
+    gauge(value = pct_free_cap,
+          min = 0,
+          max = 100,
+          sectors = gaugeSectors(
+            success = c(0, 40),
+            warning = c(41, 60),
+            danger = c(61, 100)
+          ),
+          symbol = '%',
+          href='#section-destination-specific-results'
+    )
+    
+})
+
+```
+
+> Click on the box to see destination specific results
+
+### **Table 2: Overview of the optimimum solution**
+
+```{r}
+renderDataTable({
+
+  table_to_show <- df_deci() %>%
+    group_by(name) %>% 
+    summarise(  'Number of open' = sum(num_open), 
+                'Occupied land' = sum(num_open*land_req),
+                'Service capacity' = sum(total_pop_cap),
+                'Free capacity' = sum(remaining_pop_cap))
+  
+  datatable(table_to_show, extensions = 'Buttons',
+            options = list(
+              dom = 'Blfrtip',
+              buttons = c('copy','csv','excel','pdf','print'),
+              scrollY = 400,
+              scroller = TRUE,
+              lengthMenu = list(c(10,25,50,-1), c(10,25,50, "All"))
+              )
+            )  
+})
+
+
+```
+
+Destination Specific Results
+======================================================================
+
+Column {.sidebar}
+-----------------------------------------------------------------------
+
+### Page overview:
+
+This page includes optimisation results (same as `Overal results` page) for a selected destination. Use can select what destination specific output they want to have using this drop-down box:
+```{r}
+
+selectInput("destination_id", label = "Select a destination:",
+            choices = c("Multi purpose community centre" = 1001,
+                        "GP" = 1004,
+                        "Dentist" = 1005,
+                        "Preschool/3 year old activity group" = 1006,
+                        "Childcare centre" = 1008,
+                        "Government primary school" = 1009,
+                        "Local park" = 1010,
+                        "District sports facility" = 1011,
+                        "Corner store/convenience store" = 1012,
+                        "Local shops/local supermarke" = 1013,
+                        "Speciality food destinations" = 1014,
+                        "Regional suppermarket: major suppermarket" = 1015,
+                        "Residential agedcare/retirement village/aged housing" = 2003,
+                        "Community health centre" = 2004,
+                        "Community health service organisations" = 2005,
+                        "Maternal and child health centre" = 2006,
+                        "Catholic primary school" = 2008,
+                        "Government secondary school" = 2009,
+                        "District park" = 2011,
+                        "Lower order indoor recreational centre" = 2012,
+                        "Lower order tennis courts" = 2013
+                        ))
+```
+
+Also in addition to destination type, results in this page will change based on the selected dwelling density. You can change the density using this slider:
+
+```{r}
+sliderInput("dwelling_density_dest", label = "Dwelling Density:",
+            min= 15, max = 55, value = 25, step = 2.5)
+
+
+```
+
+
+```{r}
+
+input_dir_dest <- input_dir
+decisions_dest <- read.csv(paste(input_dir_dest, "combined_decision.csv", sep = ""))
+nbhds_dest <- read.csv(paste(input_dir_dest, "combined_nbhds.csv", sep = ""))
+pxls_dest <- read.csv(paste(input_dir_dest, "combined_pxls.csv", sep = ""))
+
+df_destinations_dest <- read.csv("./inputs/destinations_HLC.csv")
+
+for(dec in 1:nrow(decisions_dest)){
+  decisions_dest$name[dec] <- df_destinations_dest$name[which(df_destinations_dest$dest_type_id == decisions_dest$dest_type_id[dec])] %>%
+    as.character()
+  decisions_dest$land_req[dec] <- df_destinations_dest$land_req_sqkm[which(df_destinations_dest$dest_type_id == decisions_dest$dest_type_id[dec])]
+}
+
+
+df_deci_dest <- reactive({
+    decisions_dest %>% 
+      filter(density == input$dwelling_density_dest, dest_type_id == input$destination_id)
+})
+
+df_nbhd_dest <- reactive({
+  nbhds_dest %>% 
+    filter(density == input$dwelling_density_dest)
+})
+
+df_pxl_dest <- reactive({
+  pxls_dest %>% 
+    filter(density == input$dwelling_density_dest)
+})
+
+dest_counter <- reactive({
+  decisions_dest %>% 
+      filter(dest_type_id == input$destination_id) %>%
+      group_by(density) %>%
+      summarise(Number_of_Open_Destinations = sum(num_open)) %>%
+      select(density, Number_of_Open_Destinations)
+})
+
+```
+
+
+Colmun
+-----------------------------------------------------------------------
+
+### **Figure 5: Selected destination distribution**
+
+```{r}
+#
+
+renderPlotly({
+  #deci_file <- paste(input_dir, "output_decision_D15.csv", sep = "")
+
+  #nbhd_file <- paste(input_dir, "init_nbhd_D15.csv", sep = "")
+  
+  #df_deci <- read.csv(deci_file)
+  
+  df_deci_dest_this <- st_as_sf(df_deci_dest(), coords = c("x", "y"))
+  
+  df_nbhd_dest_this <- st_as_sf(df_nbhd_dest(), coords = c("x", "y"))
+
+  df_pxl_dest_this <- st_as_sf(df_pxl_dest(), coords = c("x", "y"))
+  
+  df_deci_dest_this <- df_deci_dest_this %>%
+    filter(num_open >0 ) %>%
+    select(loc_id,dest_type_id, name, num_open, land_req, geometry) %>%
+    group_by(loc_id) %>%
+    summarise(Name = name,
+              Number_of_Open = sum(num_open),
+              pct_open_t = sum(num_open)/sum(df_deci_dest_this$num_open), 
+              land = sum(num_open*land_req))
+    #mutate()
+  
+  
+  df_deci_dest_this <- df_deci_dest_this %>%
+    mutate(radius = pct_open_t)
+  
+  df_deci_dest_buffered <- df_deci_dest_this %>% st_buffer(ifelse(df_deci_dest_this$radius < 0.02, yes = 0.02, 
+                                                                  no = ifelse(df_deci_dest_this$radius > 0.2, yes = 0.2, 
+                                                                              no = df_deci_dest_this$radius)))
+  df_nbhd_dest_buffered <- st_buffer(df_nbhd_dest_this, 0.4) %>%
+                        mutate(Population = pop) %>%
+                        mutate(HasPopulation = ifelse(pop > 0 , "Neighbourhood with population", "Empty neighbourhood"))
+  
+  # Square from centroids:
+  for(i in 1:nrow(df_pxl_dest_this)){
+    pxl_centre <- st_geometry(df_pxl_dest_this)[i]
+    top_right <- pxl_centre + c( 0.1, 0.1)
+    top_left <- pxl_centre + c(-0.1 , 0.1)
+    buttom_right <- pxl_centre + c(0.1, -0.1)
+    bottom_left <- pxl_centre + c(-0.1, -0.1)
+    df_pxl_dest_this$geometry[i] <- st_convex_hull(st_combine(c(top_left, top_right, bottom_left, buttom_right)))
+  }
+  
+  
+  df_pxl_dest_buffered <- df_pxl_dest_this %>%
+                        mutate(HasPopulation = ifelse(pop > 0 , "Neighbourhood with population", "Empty neighbourhood"))
+  
+  
+    q <- ggplot() +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          legend.position = "none",
+          plot.title = element_text(family = "Helvetica", face = "bold", size = (12))) +
+    geom_sf(data = df_pxl_dest_buffered, alpha = 0.8, aes(fill = HasPopulation, colour = HasPopulation)) +
+    scale_colour_manual(values = c("gray22", "gray22")) +
+    scale_fill_manual(values = c("gray77", "aquamarine3"), guide = FALSE) + 
+    geom_vline(xintercept=c(-2,-1.2,-0.4,0.4,1.2,2), color="#0072B2", size=0.5) +
+    geom_hline(yintercept=c(-2,-1.2,-0.4,0.4,1.2,2), color="#0072B2", size=0.5) +
+    geom_vline(xintercept=c(-1.8,-1.6,-1.4,-1.0,-0.8,-0.6,-0.2,0,0.2,0.6,0.8,1.0,1.4,1.6,1.8), color="#009E73", size=0.3, linetype="dotted") +
+    geom_hline(yintercept=c(-1.8,-1.6,-1.4,-1.0,-0.8,-0.6,-0.2,0,0.2,0.6,0.8,1.0,1.4,1.6,1.8), color="#009E73", size=0.3, linetype="dotted") +
+    geom_sf(data = df_deci_dest_buffered, color = "deeppink4", fill = "deeppink4", aes(text = Name,
+                                                                                   label = Number_of_Open))
+   
+  q %>% ggplotly(tooltip = c("text", "label"))  %>% style(hoveron = "fills")
+  # q %>% ggplotly(tooltip = "text") %>% style(hoveron = "fill")
+  #q %>% add_trace(text = "triangle", hoveron = "fills")
+})
+
+```
+
+### **Figure 6: Number of open destnations vs dwelling density**
+
+```{r}
+renderPlotly({
+  destination_counter <- dest_counter()
+  
+  q <- ggplot(destination_counter, aes(x = density, y = Number_of_Open_Destinations)) + geom_line() + geom_point(aes(text = paste('Density =', density, '\n', 'Number of Open Destinations:', Number_of_Open_Destinations)))
+  
+  q %>% ggplotly(tooltip = "text")
+})
+```
+
+
+Column
+-----------------------------------------------------------------------
+
+### Total numober of open destinations (from selected type)
+
+
+```{r}
+renderValueBox({
+  num_open_total <- df_deci_dest() %>% group_by(density) %>% summarise( total_open = sum(num_open)) %>% select(total_open) %>% unlist()
+  valueBox(num_open_total,
+           icon = 'fa-city',
+           href='#section-destination-specific-results')
+  
+})
+
+```
+
+### Percentage of free capacity for the selected destination
+
+```{r}
+renderGauge({
+    pct_free_cap <- df_deci_dest() %>% 
+                        group_by(density) %>%
+                        summarise( total_capacity = sum(total_pop_cap), unused_capacity = sum(remaining_pop_cap)) %>%
+                        mutate(pct_free = 100*unused_capacity/total_capacity) %>%
+                        select(pct_free) %>%
+                        unlist() %>%
+                        as.double() %>%
+                        round(2)
+    gauge(value = pct_free_cap,
+          min = 0,
+          max = 100,
+          sectors = gaugeSectors(
+            success = c(0, 40),
+            warning = c(41, 60),
+            danger = c(61, 100)
+          ),
+          symbol = '%',
+          href='#section-destination-specific-results'
+    )
+    
+})
+
+```
+
+### **Table 3: Overview of optimised solution for the selected destination**
+
+```{r}
+renderDataTable({
+
+  table_to_show_dest <- df_deci_dest() %>%
+    filter(num_open >0) %>%
+    mutate(Location = paste("x= ", x,", y= ", y, sep = "")) %>%
+    mutate(Number_of_Open = num_open) %>%
+    mutate(Population_Capacity = total_pop_cap) %>%
+    mutate(Free_Capacity = remaining_pop_cap) %>%
+    select(Location, Number_of_Open, Population_Capacity,Free_Capacity)
+
+  
+  datatable(table_to_show_dest, extensions = 'Buttons',
+            options = list(
+              dom = 'Blfrtip',
+              buttons = c('copy','csv','excel','pdf','print'),
+              scroller = TRUE,
+              lengthMenu = list(c(10,25,50,-1), c(10,25,50, "All"))
+              )
+            )  
+})
+
+
+```
