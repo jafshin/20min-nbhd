@@ -5,6 +5,11 @@
 #
 # @author AJ
 
+# TODOs
+# 1. Making the thresholds less strict
+# 2. Only major infrastructure
+# 3. 
+
 # Packages
 library(rdist)
 library(dplyr)
@@ -31,7 +36,6 @@ source("./functions/distribute_population.R")
 
 #write.csv(selection_points, file = "./outputs/selection_points.csv")
 
-
 # Reading inputs ----------------------------------------------------------
 
 # CONTROL VARIABLES
@@ -45,16 +49,12 @@ share_land_for_dest <- 0.25
 pixl_diameter <- 0.2
 nbhd_diameter <- 0.8
 
-catchment_treshold <- 0.95
-
+catchment_treshold <- 0.8
 consider_categories <- FALSE
-
 densities <- seq(from = 15, to = 55, by = 2.5)
 
 output_dir <- "./outputs/RUN25_1/" # CHANGE THIS FOR DIFFERENT RUNS
-
 ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
-
 
 total_scores_file <- paste(output_dir, "score_summary.csv", sep = "")
 total_score_df <- data.frame(density = densities)
@@ -62,18 +62,14 @@ total_score_df <- data.frame(density = densities)
 for (dwelling_per_h in densities){
   print(paste("******************* DWELLING DENSITY:", dwelling_per_h, sep = " "))
   
-  init_nbhd <- read.csv("./inputs/neighbourhoods.csv")
-  init_loc <- read.csv("./inputs/locations.csv")
-  init_dest <- read.csv("./inputs/destinations_HLC.csv")
+  init_nbhd <- read.csv("../inputs/neighbourhoods.csv")
+  init_loc <- read.csv("../inputs/locations.csv")
+  init_dest <- read.csv("../inputs/destinations_v2.csv")
   
   output_sub_dir <-  paste(output_dir, "Density_", dwelling_per_h, "/", sep = "")
-  
   ifelse(!dir.exists(output_sub_dir), dir.create(output_sub_dir), FALSE)
-  
   log_file <- paste(output_sub_dir, "output_log_D", dwelling_per_h, ".txt", sep = "") 
-  
   output_file <- paste(output_sub_dir, "output_decision_D", dwelling_per_h, ".csv", sep = "")
-  
   cat("", file = log_file, append = FALSE)
 
   # CALCUALTING NUMBER OF NEIGHBOURHOODS
@@ -89,8 +85,6 @@ for (dwelling_per_h in densities){
   # Creating the neighbourhoods ---------------------------------------------
   
   init_pixls <- make_pixels_df(pixl_diameter, share_land_for_dest, total_pop, dwelling_per_h, person_per_hh, init_dest)
-  
-  
   pixls_area <- 0.2*0.2
   
   #pixls_area <- pixl_diameter * pixl_diameter # As squares (sq.km)
@@ -121,15 +115,11 @@ for (dwelling_per_h in densities){
   #init_loc <- make_location_df_methdod_2(init_loc, init_dest, init_pixls[which(init_pixls$pop>0),] )
   
   # Creating the decision dataframe --------------------------
-  
   init_deci <- make_decsion_df(init_loc,init_dest)
   
   # Calculating distances between selection points --------------------------
-  
   init_deci <- add_distances(init_deci, init_pixls[which(init_pixls$pop>0),])
-  
   init_deci <- add_decision_vars(init_deci, init_pixls[which(init_pixls$pop>0),])
-  
   # Soring init dest based on pop_req*land_req_sqkm
   
   init_dest <- init_dest %>%
@@ -141,7 +131,6 @@ for (dwelling_per_h in densities){
   # Evolutionary optimisation -----------------------------------------------
   
   iter <- 1
-  
   # Creating worst case score
   score <- nrow(init_deci) * (-100)
   #scoring_denom <- init_dest %>% select(pop_req) %>% colSums(na.rm = TRUE) %>% as.integer()
@@ -150,7 +139,6 @@ for (dwelling_per_h in densities){
   }
   
   decision <- init_deci
-  
   while(iter < total_iters + 1){
     print(paste("############## iteration number",iter, sep = ":"))
     # Resetting the variables
@@ -167,22 +155,15 @@ for (dwelling_per_h in densities){
     iter_dest_row <- 1
     # Loop over all destinations
     for(iter_dest_row in 1:nrow(iter_dest)){
-      
       unavail_decisions <- 0
-      
       iter_dest_type <- iter_dest$dest_type_id[iter_dest_row]
       print(paste("destination:",iter_dest_type, "; iteration:", iter, "; dwelling denisty:", dwelling_per_h, sep = " "))
-      
       this_dest_deci_rows <- which(iter_deci$dest_type_id == iter_dest_type)
-      
       # FIRST destination OF TYPE iter_dest_row is also going trought the evolutionary process
-      
       # Repeating the process until all neighbourhoods are served
       error_counter <- 0
-      
       while(sum(iter_pixls[,paste("pop_not_served_by_dest_", iter_dest_type, sep = "")], na.rm = TRUE) > total_pop*(1-catchment_treshold)){
         # CREATING A LIST OF DIFFERENT LOCATIONS AND THEIR POTENTIAL CATCHMENTS
-        
         feasible_locs <- find_feasible_locs(iter_deci, iter_pixls, iter_dest, this_dest_deci_rows, iter_dest_row)
         
         feasible_locs <- feasible_locs %>%
@@ -233,9 +214,7 @@ for (dwelling_per_h in densities){
         }else{
           
           iter_deci <- add_destination_to_decision(iter_deci,new_deci_row,iter_dest_type)
-          
           iter_loc <- add_destination_to_location(iter_loc, iter_deci, new_deci_row, iter_dest_type)
-          
           iter_nbhds <- occupy_land(temp_loc_nbhds, iter_nbhds, land_to_occupy, land_to_occupy_per_nbhd)
           
           # SERVING THE NEIGHBOURS 
