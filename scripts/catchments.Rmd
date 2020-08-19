@@ -1,0 +1,240 @@
+---
+title: "catchments"
+author: "jafshin"
+date: "05/06/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Packages
+library(rdist)
+library(dplyr)
+library(ggplot2)
+library(readr)
+
+```
+
+# Model goal:
+
+Question: What will be the distances for each destintation to achived the population catchment at various densities?
+
+TODO:
+ 1. Should I include the net residential area here??? I think so!
+ 
+
+```{r initial parameters}
+
+
+pphh <- 2.6
+total_pop <- 10000
+mutation_p <- 0.20
+total_iters <- 500
+
+share_land_for_dest <- 0.25
+pixl_diameter <- 0.2
+nbhd_diameter <- 1.6
+
+catchment_treshold <- 0.8
+
+dwelling_per_h <- 15
+
+pixls_area <- 0.2*0.2
+pixls_counter <- ceiling(total_pop * 0.01 / (dwelling_per_h * pphh * pixls_area))
+
+# How many pixels?
+nbhds_area <- nbhd_diameter * nbhd_diameter # As squares (sq.km)
+#nbhds_area <- 0.4*0.4*pi # As circles (sq.km)
+nbhds_counter <- ceiling(total_pop * 0.01 / (dwelling_per_h * pphh * nbhds_area))
+
+
+```
+
+## Calculating the catchments and coverages
+
+**NOTE** It should be noted that distance to  
+
+```{r pressure, echo=FALSE}
+
+destinations <- read_csv("../inputs/destinations_forCatchment.csv", col_names = T)
+
+
+calc_catchment <- function(pop, dens, pphh){
+  return((pop*0.01)/(dens*pphh))
+}
+
+
+calc_ww_catchment <- function(pop, dens, pphh, coverage){
+  return((pop*coverage*0.01)/(dens*pphh))
+}
+
+
+calc_coverage <- function(r,r1,ca,r2=0.8){
+  
+  pct <- ifelse(test = (r1 <= r2),
+                yes = 1, 
+                no = pi*((r2+r)^2-r^2)/ca)
+  return(pct)
+}
+
+row_calcs_ww <- function(x) {
+  transmute(destinations, 
+            id=as.character(id),
+            name = name,
+            density = x,
+            ca=calc_ww_catchment(pop_req, x, pphh, coverage),
+            R=sqrt((ca/pi)+r^2),
+            CR=R-r,
+            pct=calc_coverage(r,CR,ca))
+}
+
+
+row_calcs <- function(x) {
+  transmute(destinations, 
+            id=as.character(id),
+            name = name,
+            density = x,
+            ca=calc_catchment(pop_req, x, pphh),
+            R=sqrt((ca/pi)+r^2),
+            CR=R-r,
+            pct=calc_coverage(r,CR,ca))
+}
+
+desnities <- seq(10, 60, by =1)
+
+dests_new <- purrr::map_dfr(desnities, row_calcs)
+dests_withWeight_new <- purrr::map_dfr(desnities, row_calcs_ww)
+
+
+dests_withWeight <- destinations %>%
+  mutate(r = sqrt(land_req_sqkm/pi)) %>% 
+  mutate(ca_15=calc_ww_catchment(pop_req, 15, pphh, coverage),
+         R_15=sqrt((ca_15/pi)+r^2),
+         CR_15=R_15-r,
+         pct_15=calc_coverage(r,CR_15,ca_15)) %>% 
+   mutate(ca_25=calc_ww_catchment(pop_req, 25, pphh, coverage),
+         R_25=sqrt((ca_25/pi)+r^2),
+         CR_25=R_25-r,
+         pct_25=calc_coverage(r,CR_25,ca_25)) %>% 
+   mutate(ca_35=calc_ww_catchment(pop_req, 35, pphh, coverage),
+         R_35=sqrt((ca_35/pi)+r^2),
+         CR_35=R_35-r,
+         pct_35=calc_coverage(r,CR_35,ca_35)) %>% 
+   mutate(ca_45=calc_ww_catchment(pop_req, 45, pphh, coverage),
+         R_45=sqrt((ca_45/pi)+r^2),
+         CR_45=R_45-r,
+         pct_45=calc_coverage(r,CR_45,ca_45)) %>%
+   mutate(ca_55=calc_ww_catchment(pop_req, 55, pphh, coverage),
+         R_55=sqrt((ca_55/pi)+r^2),
+         CR_55=R_55-r,
+         pct_55=calc_coverage(r,CR_55,ca_55))
+
+write_csv(dests_withWeight,path = "./catchments_ww.csv")
+
+
+dests <- destinations %>%
+  mutate(r = sqrt(land_req_sqkm/pi)) %>% 
+  mutate(ca_15=calc_catchment(pop_req, 15, pphh),
+         R_15=sqrt((ca_15/pi)+r^2),
+         CR_15=R_15-r,
+         pct_15=calc_coverage(r,CR_15,ca_15)) %>% 
+   mutate(ca_25=calc_catchment(pop_req, 25, pphh),
+         R_25=sqrt((ca_25/pi)+r^2),
+         CR_25=R_25-r,
+         pct_25=calc_coverage(r,CR_25,ca_25)) %>% 
+   mutate(ca_35=calc_catchment(pop_req, 35, pphh),
+         R_35=sqrt((ca_35/pi)+r^2),
+         CR_35=R_35-r,
+         pct_35=calc_coverage(r,CR_35,ca_35)) %>% 
+   mutate(ca_45=calc_catchment(pop_req, 45, pphh),
+         R_45=sqrt((ca_45/pi)+r^2),
+         CR_45=R_45-r,
+         pct_45=calc_coverage(r,CR_45,ca_45)) %>%
+   mutate(ca_55=calc_catchment(pop_req, 55, pphh),
+         R_55=sqrt((ca_55/pi)+r^2),
+         CR_55=R_55-r,
+         pct_55=calc_coverage(r,CR_55,ca_55))
+
+write_csv(dests,path = "./catchments4.csv")
+
+```
+
+### Drawing the ouputs
+
+Here I will have four plots one of each
+
+```{r Theme}
+mynamestheme <- theme(plot.title = element_text(face = "bold", size = (12)), 
+                 legend.title = element_text(colour = "steelblue",  face = "bold.italic"), 
+                 legend.text = element_text(face = "italic", colour="steelblue4"), 
+                  axis.title = element_text(size = (10), colour = "steelblue4"),
+                  axis.text = element_text(colour = "cornflowerblue", size = (10)))
+```
+
+```{r}
+
+dests_new %>% 
+  filter(stringr::str_detect(id, "^1")) %>% 
+  ggplot(aes(density, pct * 100, color = name)) +
+  geom_path(aes(group = name)) +
+  theme_igray()+ scale_color_calc() +
+  labs(title= "Percetage of catchment covered in 800m distance \n(Level 1 destinations)", y="Percentage (%)", x = "Density (Dwelling per Hectare)", color = "Destination")
+
+```
+
+
+```{r}
+library(viridis)
+
+dests_new %>% 
+  filter(stringr::str_detect(id, "^2")) %>% 
+  ggplot(aes(density, pct * 100, color = name)) +
+  geom_path(aes(group = name)) +
+  theme_igray()+ scale_color_calc() +
+  labs(title= "Percetage of catchment covered in 800m distance \n(Level 2 destinations)", y="Percentage (%)", x = "Density (Dwelling per Hectare)", color = "Destination")
+
+```
+
+
+```{r}
+dests_withWeight %>% 
+  mutate(id=as.character(id)) %>% 
+  filter(stringr::str_detect(id, "^1")) %>% 
+  select(name, starts_with("pct")) %>%
+  tidyr::pivot_longer(-name, names_to = "density", values_to = "pct") %>% 
+  ggplot(aes(density, pct * 100, color = name)) +
+  geom_path(aes(group = name)) +
+  theme_igray()+ scale_color_calc() +
+  labs(title= "Percetage of catchment covered in 800m distance \n(Level 1 destinations)", y="Percentage (%)", x = "Density (Dwelling per Hectare)", color = "Destination")
+
+dests_withWeight_new %>% 
+  filter(stringr::str_detect(id, "^1")) %>% 
+  ggplot(aes(density, pct * 100, color = name)) +
+  geom_path(aes(group = name)) +
+  theme_igray()+ scale_color_calc() +
+  labs(title= "Percetage of catchment covered in 800m distance \n(Level 1 destinations)", y="Percentage (%)", x = "Density (Dwelling per Hectare)", color = "Destination")
+
+```
+
+
+```{r}
+library(viridis)
+
+dests_withWeight %>% 
+  mutate(id=as.character(id)) %>% 
+  filter(stringr::str_detect(id, "^2")) %>% 
+  select(name, starts_with("pct")) %>%
+  tidyr::pivot_longer(-name, names_to = "density", values_to = "pct") %>% 
+  ggplot(aes(density, pct * 100, color = name)) +
+  geom_path(aes(group = name)) +
+  theme_igray()+ scale_color_calc() +
+  labs(title= "Percetage of catchment covered in 800m distance \n(Level 2 destinations)", y="Percentage (%)", x = "Density (Dwelling per Hectare)", color = "Destination")
+
+dests_withWeight_new %>% 
+  filter(stringr::str_detect(id, "^2")) %>% 
+  ggplot(aes(density, pct * 100, color = name)) +
+  geom_path(aes(group = name)) +
+  theme_igray()+ scale_color_calc() + labs(title= "Percetage of catchment covered in 800m distance \n(Level 2 destinations)", y="Percentage (%)", x = "Density (Dwelling per Hectare)", color = "Destination")
+
+```

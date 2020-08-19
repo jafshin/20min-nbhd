@@ -1,0 +1,162 @@
+---
+title: "Density"
+author: "jafshin"
+date: "15/06/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Packages
+library(rdist)
+library(dplyr)
+library(ggplot2)
+library(readr)
+
+source("./functions/initation_functions.R")
+source("./functions/land_updating.R")
+source("./functions/visualisation.R")
+source("./functions/make_pixels_df.R")
+source("./functions/distribute_population.R")
+```
+
+## Experiment 2: Finding the density
+
+The aim of this experiment is to find at what density there will be enough 20 min coverage given fix number of destinations. 
+
+Steps:
+
+ - Total population is given
+ - Calculating the number of destinations based on the total population
+ - Distributing the individuals
+ - Finding the best locations
+
+```{r Control Variables}
+
+
+
+pphh <- 2.6
+pop <- 30000
+mutation_p <- 0.20
+total_iters <- 500
+
+share_land_for_dest <- 0.25
+share_land_for_resid <- 0.7
+pxl_d <- 0.2
+nbhd_d <- 1.6
+
+catchment_treshold <- 0.8
+
+dph <- 15
+
+
+
+
+```
+
+```{r Reading inputs}
+
+destinations <- read_csv("../inputs/destinations_v3.csv", col_names = T)
+
+```
+
+### How many of each destination is needed?
+```{r}
+
+destinations <- destinations %>% 
+  mutate(num_net = ceiling(pop/capacity)) %>% 
+  mutate(num_adj = ceiling((pop*coverage)/capacity))
+
+destinations %>% summarise(sum_net = sum(num_net),
+                           sum_adj = sum(num_adj))
+glimpse(destinations)
+
+```
+
+## Building the neighbourhoods
+
+
+TODO:
+ 1. Adding those incorporating within the others
+ 2. Adding those should be adjacent
+ 3. Adding those should be at the town centre or futher away
+ 4. Apply density to net dev area and not to the total
+
+```{r nbhds building}
+
+print(paste("******************* DWELLING DENSITY:", dph, sep = " "))
+  
+  init_nbhd <- read.csv("../inputs/neighbourhoods.csv")
+  init_loc <- read.csv("../inputs/locations.csv")
+  init_dest <- read.csv("../inputs/destinations_v3.csv")
+  
+  output_sub_dir <-  paste(output_dir, "Density_", dph, "/", sep = "")
+  ifelse(!dir.exists(output_sub_dir), dir.create(output_sub_dir), FALSE)
+  log_file <- paste(output_sub_dir, "output_log_D", dph, ".txt", sep = "") 
+  output_file <- paste(output_sub_dir, "output_decision_D", dph, ".csv", sep = "")
+  cat("", file = log_file, append = FALSE)
+  
+  
+  cat(paste("Total Population", pop, sep = ","),  file = log_file, append = , sep="\n")
+  cat(paste("Dweling Density", dph, sep = ","),  file = log_file, append = TRUE, sep="\n")
+  cat(paste("***********", "***********", sep = ","),  file = log_file, append = TRUE, sep="\n")
+  
+  # CALCUALTING NUMBER OF NEIGHBOURHOODS
+  
+  pxl_a <- 0.2*0.2
+  pxl_dev_a <- pxl_a * share_land_for_resid
+  pxl_n <- ceiling(pop * 0.01 / (dph * pphh * pxl_dev_a))
+
+  # How many pixels?
+  nbhd_a <- nbhd_d * nbhd_d # As squares (sq.km)
+  nbhd_dev_a <- nbhd_a * share_land_for_resid # As squares (sq.km)
+
+  #nbhd_a <- 0.4*0.4*pi # As circles (sq.km)
+  nbhd_n <- ceiling(pop * 0.01 / (dph * pphh * nbhd_dev_a))
+  nbhd_p <- round(pop / nbhd_n)
+  
+  # Creating the neighbourhoods ---------------------------------------------
+  init_pixls <- make_pixels_df(pxl_d, nbhd_n, share_land_for_dest, pop, dph, person_per_hh, init_dest)
+
+  avg_px_pop <- ceiling (pop / pxl_n)
+
+  init_pixls <- distribute_population(avg_px_pop, init_nbhd, init_pixls, pop, init_dest)
+  # Selecting only occupied pixels
+  init_pixls <- init_pixls %>% filter(pop > 0)
+  # Adding Land
+  for (i in 1:nbhd_n){
+    init_nbhd$remaining_land_for_dest[i] <- init_nbhd$land_for_dest[i] <- nbhd_a * share_land_for_dest
+  }
+  
+  for (nb in init_nbhd$ID) {
+    init_nbhd$pop[nb] <- init_pixls %>% 
+                          filter(nbhd == nb) %>% 
+                          summarise(pop = sum(pop)) %>%
+                          select(pop)
+  }
+  
+  init_nbhd$pop <- init_nbhd$pop %>% unlist()
+  
+  # Creating the locations ---------------------------------------------
+  
+  init_loc <- make_location_df_methdod_2(init_loc, init_dest, init_nbhd[which(init_nbhd$pop>0),] )
+  #init_loc <- make_location_df_methdod_2(init_loc, init_dest, init_pixls[which(init_pixls$pop>0),] )
+  
+  # Creating the decision dataframe --------------------------
+  init_deci <- make_decsion_df(init_loc,init_dest)
+  
+  # Calculating distances between selection points --------------------------
+  init_deci <- add_distances(init_deci, init_pixls[which(init_pixls$pop>0),])
+  init_deci <- add_decision_vars(init_deci, init_pixls[which(init_pixls$pop>0),])
+  # Soring init dest based on pop_req*land_req_sqkm
+  
+  init_dest <- init_dest %>%
+                mutate(pop_land_score = pop_req*land_req_sqkm) %>%
+                mutate(pop_land_weigh = pop_land_score/sum(pop_land_score)) %>%
+                arrange(desc(pop_land_weigh)) %>%
+                select(-pop_land_score)
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

@@ -43,7 +43,7 @@ source("./functions/distribute_population.R")
 person_per_hh <- 2.6
 total_pop <- 30000
 mutation_p <- 0.20
-total_iters <- 5
+total_iters <- 500
 
 share_land_for_dest <- 0.25
 pixl_diameter <- 0.2
@@ -53,7 +53,7 @@ catchment_treshold <- 0.8
 consider_categories <- FALSE
 densities <- seq(from = 15, to = 55, by = 2.5)
 
-output_dir <- "./outputs/RUN25_1/" # CHANGE THIS FOR DIFFERENT RUNS
+output_dir <- "./outputs/RunNew/" # CHANGE THIS FOR DIFFERENT RUNS
 ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
 
 total_scores_file <- paste(output_dir, "score_summary.csv", sep = "")
