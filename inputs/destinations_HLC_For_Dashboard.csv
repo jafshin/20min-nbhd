@@ -1,0 +1,33 @@
+id,dest_type_id,name,category,land_req_sqkm,pop_req,dist_in_20_min,Note
+1001,1001,Multi purpose community centre,Lifelong learning opportunities?,0.008,8000,0.8,Is included: Distance TBC
+1002,1002,Youth space/facility,Sport and recreation facilities,,,,"Not included: Co-locates with community centre, will be added in the next phase"
+1003,1003,Community arts space,Lifelong learning opportunities?,,,3.2,"Not included: Co-locates with community centre, will be added in the next phase"
+1004,1004,GP,Health facilities and services,3.83E-05,300,0.8,Is included: Distance based on HLC research
+1005,1005,Dentists,Health facilities and services,0.000115,1000,0.8,Is included: Distance based on HLC research
+1006,1006,Preschool 3 year old activity group,Local schools,0.0025,10000,1,Is included: Distance TBC
+1007,1007,Play groups,Local playgrounds and parks,,,,"Not included: Co-locates with community centre, will be added in the next phase"
+1008,1008,Childcare centre,Local schools,0.0025,9000,0.8,Is included: Distance TBC
+1009,1009,Government primary school,Local schools,0.035,9000,1,Is included: Distance based on HLC research
+1010,1010,Local Park,Local playgrounds and parks,0.0085,1000,0.8,Is included: Distance based on HLC research
+1011,1011,District sports facility,Sport and recreation facilities,0.08,9000,1.2,Is included: Distance based on HLC research
+1012,1012,Corner Store/Convenience Store,Local shopping centres,0.000115,1000,0.8,Is included: Distance based on HLC research
+1013,1013,Local shops/Local supermarket,Local shopping centres,0.0003,1000,0.8,Is included: Distance based on HLC research
+1014,1014,Speciality food destination,Local shopping centres,0.0003,1000,0.8,Is included: Distance based on HLC research
+1015,1015,Regional supermarket: Major supermarket,Local shopping centres,0.003,10000,0.8,Is included: Distance TBC
+1016,1016,Post office,,,,,Not included: Not applicable to 20Min neighbourhoods concept
+1017,1017,Church,,,,,Not included: Not applicable to 20Min neighbourhoods concept
+2001,2001,Neighbourhood house,Lifelong learning opportunities?,,,,"Not included: Co-locates with community centre, will be added in the next phase"
+2002,2002,Community arts facility,Lifelong learning opportunities?,,,3.2,"Not included: Co-locates with government secondary school, will be added in the next phase"
+2003,2003,Residential agedcare/retirement village/aged housing,Ability to age in place,0.1,30000,1,"Not included: Co-locates with community centre, will be added in the next phase"
+2004,2004,Community health centre,Health facilities and services,0.006,30000,1,Is included: Distance based on HLC research
+2005,2005,Community health service Organisations,Health facilities and services,0.004,30000,1,Is included: Distance TBC
+2006,2006,Maternal and Child Health Centre,Health facilities and services,0.001,16000,0.8,Is included: Distance based on HLC research
+2007,2007,Occasional child care centre,Health facilities and services,,,,"Not included: Co-locates with community centre, will be added in the next phase"
+2008,2008,Catholic Primary School,Local schools,0.026,18000,1,Is included: Distance based on HLC research
+2009,2009,Government Secondary School,Local schools,0.084,30000,3.2,Is included: Distance based on HLC research
+2010,2010,Country fire authority CFA station,-,-,-,-,Not included: Not applicable to 20Min neighbourhoods concept
+2011,2011,District Park,Green Streets and spaces,0.04,30000,1.2,Is included: Distance TBC
+2012,2012,Lower order indoor recreational centre,Sport and recreation facilities,0.006,20000,1.2,Is included: Distance based on HLC research
+2013,2013,Lower order Tennis courts,Sport and recreation facilities,0.015,25000,1.2,Is included: Distance based on HLC research
+2014,2014,Large supermarket,Local shopping centres,0.0045,15000,0.8,"Not included: Should be an alternative to Regional supermarket, will be added next phase"
+3001,3001,Cinema,Sport and recreation facilities,,,3.2,"Not included: as they have wider catchment of a neighbourhood (typically 50,000 or more depending on number of screens)"
