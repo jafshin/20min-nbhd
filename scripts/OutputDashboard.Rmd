@@ -88,9 +88,9 @@ Colmun {.tabset data-width=450}
 ### **Table 1. Destinations and their attributes**
 
 ```{r}
-df_destinations <- read.csv("./inputs/destinations_HLC.csv")
+df_destinations <- read.csv("../inputs/destinations_HLC.csv")
 
-df_destinations_to_show <-  read.csv("./inputs/destinations_HLC_For_Dashboard.csv")
+df_destinations_to_show <-  read.csv("../inputs/destinations_HLC_For_Dashboard.csv")
 
 df_destinations_to_show <- df_destinations_to_show %>%
                       dplyr::select("ID" = id, "Name" = name, "Category" = category, "Land requirement (sq.km)" = land_req_sqkm, "Provision/Population" = pop_req, "Service specific buffer (km)" =  dist_in_20_min, Note)
@@ -129,7 +129,7 @@ sliderInput("dwelling_density", label = "Dwelling Density:",
 
 
 ```{r}
-input_dir <- "./outputs/RUN25_ToServer/"
+input_dir <- "../outputs/RUN25_ToServer/"
 decisions <- read.csv(paste(input_dir, "combined_decision.csv", sep = ""))
 nbhds <- read.csv(paste(input_dir, "combined_nbhds.csv", sep = ""))
 pxls <- read.csv(paste(input_dir, "combined_pxls.csv", sep = ""))
@@ -374,7 +374,7 @@ decisions_dest <- read.csv(paste(input_dir_dest, "combined_decision.csv", sep = 
 nbhds_dest <- read.csv(paste(input_dir_dest, "combined_nbhds.csv", sep = ""))
 pxls_dest <- read.csv(paste(input_dir_dest, "combined_pxls.csv", sep = ""))
 
-df_destinations_dest <- read.csv("./inputs/destinations_HLC.csv")
+df_destinations_dest <- read.csv("../inputs/destinations_HLC.csv")
 
 for(dec in 1:nrow(decisions_dest)){
   decisions_dest$name[dec] <- df_destinations_dest$name[which(df_destinations_dest$dest_type_id == decisions_dest$dest_type_id[dec])] %>%

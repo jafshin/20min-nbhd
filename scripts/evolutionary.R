@@ -10,105 +10,114 @@
 # 2. Only major infrastructure
 # 3. 
 
+
 # Packages
 library(rdist)
 library(dplyr)
 library(ggplot2)
+library(sf)
+library(readr)
+
 
 source("./functions/initation_functions.R")
 source("./functions/land_updating.R")
 source("./functions/visualisation.R")
 source("./functions/make_pixels_df.R")
 source("./functions/distribute_population.R")
+source("./functions/make_nbhds.R")
 
-# Selection points:
-# xs <- seq(from = 2, to = -2, by = -0.2)
-# ys <- seq(from = 2, to = -2, by = -0.2)
-# selection_points <- data.frame(id = seq(from = 1, to = length(xs)*length(ys), by = 1))
-# i <- 1
-# for (x in xs){
-#  for (y in ys){
-#    selection_points$x[i] <- x
-#    selection_points$y[i] <- y
-#    i <- i+1
-#  }
-# }
-
-#write.csv(selection_points, file = "./outputs/selection_points.csv")
-
-# Reading inputs ----------------------------------------------------------
-
-# CONTROL VARIABLES
-#dwelling_per_h <- 35 # in hectars
-person_per_hh <- 2.6
-total_pop <- 30000
+# Control variables
+pphh <- 2.6
+pop <- 30000
 mutation_p <- 0.20
-total_iters <- 500
+total_iters <- 10
 
 share_land_for_dest <- 0.25
-pixl_diameter <- 0.2
-nbhd_diameter <- 0.8
+share_land_for_resid <- 0.7
+pxl_d <- 0.2
+nbhd_d <- 1.6
+dph <- 15
 
-catchment_treshold <- 0.8
-consider_categories <- FALSE
+catchment_treshold <- 0.8 # TODO make this dependent on the destination type
+consider_categories <- FALSE # TODO make this to work
 densities <- seq(from = 15, to = 55, by = 2.5)
 
-output_dir <- "./outputs/RunNew/" # CHANGE THIS FOR DIFFERENT RUNS
+# Setting up folders ------------------------------------------------------
+
+output_dir <- "../outputs/RunNewSeptember/" # CHANGE THIS FOR DIFFERENT RUNS
 ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
 
 total_scores_file <- paste(output_dir, "score_summary.csv", sep = "")
 total_score_df <- data.frame(density = densities)
 
-for (dwelling_per_h in densities){
-  print(paste("******************* DWELLING DENSITY:", dwelling_per_h, sep = " "))
-  
+for (dph in densities){
+  print(paste("******************* DWELLING DENSITY:", dph, sep = " "))
+  # REading inputs
   init_nbhd <- read.csv("../inputs/neighbourhoods.csv")
   init_loc <- read.csv("../inputs/locations.csv")
-  init_dest <- read.csv("../inputs/destinations_v2.csv")
+  init_dest <- read.csv("../inputs/destinations_v3.csv")
   
-  output_sub_dir <-  paste(output_dir, "Density_", dwelling_per_h, "/", sep = "")
+  # Setting up folders for the denisty
+  output_sub_dir <-  paste(output_dir, "Density_", dph, "/", sep = "")
   ifelse(!dir.exists(output_sub_dir), dir.create(output_sub_dir), FALSE)
-  log_file <- paste(output_sub_dir, "output_log_D", dwelling_per_h, ".txt", sep = "") 
-  output_file <- paste(output_sub_dir, "output_decision_D", dwelling_per_h, ".csv", sep = "")
+  log_file <- paste(output_sub_dir, "output_log_D", dph, ".txt", sep = "") 
+  output_file <- paste(output_sub_dir, "output_decision_D", dph, ".csv", sep = "")
   cat("", file = log_file, append = FALSE)
 
   # CALCUALTING NUMBER OF NEIGHBOURHOODS
-  nbhds_area <- nbhd_diameter * nbhd_diameter # As squares (sq.km)
-  #nbhds_area <- 0.4*0.4*pi # As circles (sq.km)
-  nbhds_counter <- round(total_pop * 0.01 / (dwelling_per_h * person_per_hh * nbhds_area))
-  nbhds_pop <- round(total_pop / nbhds_counter)
   
-  cat(paste("Total Population", total_pop, sep = ","),  file = log_file, append = , sep="\n")
-  cat(paste("Dweling Density", dwelling_per_h, sep = ","),  file = log_file, append = TRUE, sep="\n")
-  cat(paste("***********", "***********", sep = ","),  file = log_file, append = TRUE, sep="\n")
-
+  pxl_a <- 0.2*0.2
+  pxl_dev_a <- pxl_a * share_land_for_resid
+  pxl_n <- ceiling(pop * 0.01 / (dph * pphh * pxl_dev_a))
+  
+  # How many pixels?
+  nbhd_sq <- make_nbhds(nbhd_d)
+  nbhd_a <- nbhd_d * nbhd_d # As squares (sq.km)
+  nbhd_dev_a <- nbhd_a * share_land_for_resid # As squares (sq.km)
+  
+  #nbhd_a <- 0.4*0.4*pi # As circles (sq.km)
+  nbhd_n <- ceiling(pop * 0.01 / (dph * pphh * nbhd_dev_a))
+  nbhd_p <- round(pop / nbhd_n)
+  
   # Creating the neighbourhoods ---------------------------------------------
+  study_area_d <- nbhd_d * (nbhd_n + 2)
   
-  init_pixls <- make_pixels_df(pixl_diameter, share_land_for_dest, total_pop, dwelling_per_h, person_per_hh, init_dest)
-  pixls_area <- 0.2*0.2
-  
-  #pixls_area <- pixl_diameter * pixl_diameter # As squares (sq.km)
-  #pixls_area <- 0.4*0.4*pi # As circles (sq.km)
-  pixls_counter <- ceiling (total_pop * 0.01 / (dwelling_per_h * person_per_hh * pixls_area))
-  avg_px_pop <- ceiling (total_pop / pixls_counter)
+  init_pixls <- make_pixels_df(pxl_d, share_land_for_dest, pop, dph, pphh, study_area_d, nbhd_sq)
 
-  init_pixls <- distribute_population(avg_px_pop, init_nbhd, init_pixls, total_pop, init_dest)
+  avg_px_pop <- ceiling (pop / pxl_n)
+  
+  #init_pixls <- distribute_population(avg_px_pop, init_nbhd, init_pixls, pop, init_dest)
+
+  remaining_population <- pop
+  for (nb in nbhd_sq$NBHD_ID) {
+    my_pixls <- which(init_pixls$NBHD_ID == nb)
+    for (px in my_pixls){
+      init_pixls[px, "pop"] <- min(avg_px_pop, remaining_population)
+      remaining_population <- remaining_population - init_pixls$pop[px]
+    }
+  }
+  
   # Selecting only occupied pixels
   init_pixls <- init_pixls %>% filter(pop > 0)
   # Adding Land
-  for (i in 1:nbhds_counter){
-    init_nbhd$remaining_land_for_dest[i] <- init_nbhd$land_for_dest[i] <- nbhds_area * share_land_for_dest
+  for (i in 1:nbhd_n){
+    init_nbhd$remaining_land_for_dest[i] <- init_nbhd$land_for_dest[i] <- nbhd_a * share_land_for_dest
   }
+
   
   for (nb in init_nbhd$ID) {
     init_nbhd$pop[nb] <- init_pixls %>% 
-                          filter(nbhd == nb) %>% 
-                          summarise(pop = sum(pop)) %>%
-                          select(pop)
+      filter(NBHD_ID == nb) %>% 
+      summarise(pop = sum(pop)) %>%
+      select(pop)
   }
   
   init_nbhd$pop <- init_nbhd$pop %>% unlist()
   
+  cat(paste("Total Population", pop, sep = ","),  file = log_file, append = , sep="\n")
+  cat(paste("Dweling Density", dph, sep = ","),  file = log_file, append = TRUE, sep="\n")
+  cat(paste("***********", "***********", sep = ","),  file = log_file, append = TRUE, sep="\n")
+
   # Creating the locations ---------------------------------------------
   
   init_loc <- make_location_df_methdod_2(init_loc, init_dest, init_nbhd[which(init_nbhd$pop>0),] )
@@ -117,16 +126,24 @@ for (dwelling_per_h in densities){
   # Creating the decision dataframe --------------------------
   init_deci <- make_decsion_df(init_loc,init_dest)
   
+  init_deci_sf <- init_deci %>% 
+    st_as_sf(coords=c("x","y"), remove=F) 
+  
   # Calculating distances between selection points --------------------------
-  init_deci <- add_distances(init_deci, init_pixls[which(init_pixls$pop>0),])
-  init_deci <- add_decision_vars(init_deci, init_pixls[which(init_pixls$pop>0),])
+  for (j in 1:nrow(init_pixls)){
+    new_col_name <- paste0("distance_to_",as.character(init_pixls$ID[j]))
+    init_deci_sf <- init_deci_sf %>% 
+      mutate(!!new_col_name:=as.numeric(st_distance(.,init_pixls[j,])))
+  }  
+  
+  init_deci <- add_decision_vars(init_deci, init_pixls)
   # Soring init dest based on pop_req*land_req_sqkm
   
   init_dest <- init_dest %>%
-                mutate(pop_land_score = pop_req*land_req_sqkm) %>%
-                mutate(pop_land_weigh = pop_land_score/sum(pop_land_score)) %>%
-                arrange(desc(pop_land_weigh)) %>%
-                select(-pop_land_score)
+    mutate(pop_land_score = pop_req*land_req_sqkm) %>%
+    mutate(pop_land_weigh = pop_land_score/sum(pop_land_score)) %>%
+    arrange(desc(pop_land_weigh)) %>%
+    select(-pop_land_score)
   
   # Evolutionary optimisation -----------------------------------------------
   
@@ -157,12 +174,12 @@ for (dwelling_per_h in densities){
     for(iter_dest_row in 1:nrow(iter_dest)){
       unavail_decisions <- 0
       iter_dest_type <- iter_dest$dest_type_id[iter_dest_row]
-      print(paste("destination:",iter_dest_type, "; iteration:", iter, "; dwelling denisty:", dwelling_per_h, sep = " "))
+      print(paste("destination:",iter_dest_type, "; iteration:", iter, "; dwelling denisty:", dph, sep = " "))
       this_dest_deci_rows <- which(iter_deci$dest_type_id == iter_dest_type)
       # FIRST destination OF TYPE iter_dest_row is also going trought the evolutionary process
       # Repeating the process until all neighbourhoods are served
       error_counter <- 0
-      while(sum(iter_pixls[,paste("pop_not_served_by_dest_", iter_dest_type, sep = "")], na.rm = TRUE) > total_pop*(1-catchment_treshold)){
+      while(sum(iter_pixls[,paste("pop_not_served_by_dest_", iter_dest_type, sep = "")], na.rm = TRUE) > pop*(1-catchment_treshold)){
         # CREATING A LIST OF DIFFERENT LOCATIONS AND THEIR POTENTIAL CATCHMENTS
         feasible_locs <- find_feasible_locs(iter_deci, iter_pixls, iter_dest, this_dest_deci_rows, iter_dest_row)
         
@@ -286,11 +303,11 @@ for (dwelling_per_h in densities){
 
   }
   # Writing some of the inputs
-  write.csv(neighbourhood_output, file = paste(output_sub_dir, "nbhd_", "D", dwelling_per_h, ".csv", sep = ""))
-  write.csv(pixels_output, file = paste(output_sub_dir, "pixls", "D", dwelling_per_h, ".csv", sep = ""))
+  write.csv(neighbourhood_output, file = paste(output_sub_dir, "nbhd_", "D", dph, ".csv", sep = ""))
+  write.csv(pixels_output, file = paste(output_sub_dir, "pixls", "D", dph, ".csv", sep = ""))
   # writing outputs 
   cat(paste("Final_best_score", score, sep = ","),file=log_file,append=TRUE, sep="\n")
-  total_score_df$score[which(total_score_df$density == dwelling_per_h)] <- score
+  total_score_df$score[which(total_score_df$density == dph)] <- score
   write.csv(decision, file = output_file)
   
 }

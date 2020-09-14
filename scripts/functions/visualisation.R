@@ -1,5 +1,5 @@
 summerise_destinations <- function(densities, output_dir){
-  dest_df <- read.csv("./inputs/destinations.csv")
+  dest_df <- read.csv("../inputs/destinations_v3.csv")
   
   dest_df <- dest_df[,c(2:3)]
   

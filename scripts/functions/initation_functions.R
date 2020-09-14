@@ -71,16 +71,13 @@ make_location_df_methdod_2 <- function(init_loc, init_dest, init_nbhd_with_pop )
   return(init_loc)
 }
 
-add_distances <- function(init_deci, init_nbhd){
+add_distances <- function(init_deci, init_pixls){
   # Adding dists
-  for (i in 1:nrow(init_deci)){
-    for (j in 1:nrow(init_nbhd)){
-      new_col_name <- as.character(init_nbhd$ID[j])
-      x_dist <- cdist(init_deci$x[i], init_nbhd$x[j], metric = "euclidean") # euclidean, manhattan, minkowski, etc.
-      y_dist <- cdist(init_deci$y[i], init_nbhd$y[j], metric = "euclidean")
-      init_deci[i, get("new_col_name")] <- x_dist + y_dist
-    }
-  }
+  for (j in 1:nrow(init_pixls)){
+    new_col_name <- paste0("distance_to_",as.character(init_pixls$ID[j]))
+    init_deci <- init_deci %>% 
+      mutate(!!new_col_name:=as.numeric(st_distance(.,init_pixls[j])))
+  }  
   return(init_deci)
 }
 

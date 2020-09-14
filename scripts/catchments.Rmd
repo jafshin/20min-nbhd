@@ -57,7 +57,8 @@ nbhds_counter <- ceiling(total_pop * 0.01 / (dwelling_per_h * pphh * nbhds_area)
 
 ```{r pressure, echo=FALSE}
 
-destinations <- read_csv("../inputs/destinations_forCatchment.csv", col_names = T)
+destinations <- read_csv("../inputs/destinations_forCatchment.csv", col_names = T) %>% 
+  mutate(r=sqrt(land_req_sqkm/pi))
 
 
 calc_catchment <- function(pop, dens, pphh){
@@ -178,7 +179,6 @@ dests_new %>%
   filter(stringr::str_detect(id, "^1")) %>% 
   ggplot(aes(density, pct * 100, color = name)) +
   geom_path(aes(group = name)) +
-  theme_igray()+ scale_color_calc() +
   labs(title= "Percetage of catchment covered in 800m distance \n(Level 1 destinations)", y="Percentage (%)", x = "Density (Dwelling per Hectare)", color = "Destination")
 
 ```
@@ -191,7 +191,6 @@ dests_new %>%
   filter(stringr::str_detect(id, "^2")) %>% 
   ggplot(aes(density, pct * 100, color = name)) +
   geom_path(aes(group = name)) +
-  theme_igray()+ scale_color_calc() +
   labs(title= "Percetage of catchment covered in 800m distance \n(Level 2 destinations)", y="Percentage (%)", x = "Density (Dwelling per Hectare)", color = "Destination")
 
 ```
@@ -205,14 +204,12 @@ dests_withWeight %>%
   tidyr::pivot_longer(-name, names_to = "density", values_to = "pct") %>% 
   ggplot(aes(density, pct * 100, color = name)) +
   geom_path(aes(group = name)) +
-  theme_igray()+ scale_color_calc() +
   labs(title= "Percetage of catchment covered in 800m distance \n(Level 1 destinations)", y="Percentage (%)", x = "Density (Dwelling per Hectare)", color = "Destination")
 
 dests_withWeight_new %>% 
   filter(stringr::str_detect(id, "^1")) %>% 
   ggplot(aes(density, pct * 100, color = name)) +
   geom_path(aes(group = name)) +
-  theme_igray()+ scale_color_calc() +
   labs(title= "Percetage of catchment covered in 800m distance \n(Level 1 destinations)", y="Percentage (%)", x = "Density (Dwelling per Hectare)", color = "Destination")
 
 ```
@@ -228,13 +225,12 @@ dests_withWeight %>%
   tidyr::pivot_longer(-name, names_to = "density", values_to = "pct") %>% 
   ggplot(aes(density, pct * 100, color = name)) +
   geom_path(aes(group = name)) +
-  theme_igray()+ scale_color_calc() +
   labs(title= "Percetage of catchment covered in 800m distance \n(Level 2 destinations)", y="Percentage (%)", x = "Density (Dwelling per Hectare)", color = "Destination")
 
 dests_withWeight_new %>% 
   filter(stringr::str_detect(id, "^2")) %>% 
   ggplot(aes(density, pct * 100, color = name)) +
   geom_path(aes(group = name)) +
-  theme_igray()+ scale_color_calc() + labs(title= "Percetage of catchment covered in 800m distance \n(Level 2 destinations)", y="Percentage (%)", x = "Density (Dwelling per Hectare)", color = "Destination")
+  labs(title= "Percetage of catchment covered in 800m distance \n(Level 2 destinations)", y="Percentage (%)", x = "Density (Dwelling per Hectare)", color = "Destination")
 
 ```

@@ -99,14 +99,11 @@ getCatchment <- function(this_dest,loc){
   
 }
 
-
 # Main --------------------------------------------------------------------
-
 
 person_per_hh <- 2.6
 
 share_land_for_dest <- 0.25
-
 
 densities <- seq(from = 15, to = 55, by = 2.5)
 
@@ -129,11 +126,6 @@ loc <- read_csv("../inputs/locations.csv")
 for (i in 1:nrow(dest)){
   getCatchment(dest[i,],loc)
 }
-
-
-
-
-
 
 total_score_df <- data.frame(density = densities)
 dwelling_per_h <- 15
