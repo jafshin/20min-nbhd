@@ -1,12 +1,12 @@
-make_pixels_df <- function(pixl_diameter, share_land_for_dest, total_pop, dwelling_per_h, person_per_hh, study_area_d, nbhd_sq){
+make_pixels_df <- function(pxl_d, share_land_for_dest, total_pop, dwelling_per_h, person_per_hh, study_area_d, nbhd_sq){
  
   # Making initial nbhds df
-  my_seq <- seq(from = -(study_area_d/2)+pixl_diameter, to = (study_area_d/2)-pixl_diameter, by = pixl_diameter)
+  my_seq <- seq(from = -(study_area_d/2)+pxl_d, to = (study_area_d/2)-pxl_d, by = pxl_d)
   pixls <- data.frame(matrix(nrow = length(my_seq)^2, ncol = 2))
   colnames(pixls) <- c("x", "y")
   my_row <- 1
-  for(i in seq(from = -(study_area_d/2)+pixl_diameter, to = (study_area_d/2)-pixl_diameter, by = pixl_diameter)){
-    for(j in seq(from = -(study_area_d/2)+pixl_diameter, to = (study_area_d/2)-pixl_diameter, by = pixl_diameter)){
+  for(i in seq(from = -(study_area_d/2)+pxl_d, to = (study_area_d/2)-pxl_d, by = pxl_d)){
+    for(j in seq(from = -(study_area_d/2)+pxl_d, to = (study_area_d/2)-pxl_d, by = pxl_d)){
       pixls$x[my_row] <- i
       pixls$y[my_row] <- j
       my_row <- my_row + 1
@@ -25,10 +25,13 @@ make_pixels_df <- function(pixl_diameter, share_land_for_dest, total_pop, dwelli
   pixls_sf <- pixls %>% 
     st_as_sf(coords=c("x","y"), remove=F) %>% 
     mutate(dist_to_centre=as.numeric(st_distance(.,st_point(c(0.0,0.0))))) %>% 
-    arrange(dist_to_centre) %>% 
-    st_join(st_as_sf(nbhd_sq))
+    arrange(dist_to_centre)
   
-  plot(pixls_sf)
+  #plot(pixls_sf)
+  #plot(nbhd_sq)
+  
+  #st_write(pixls_sf, "pxl2.sqlite")
+  #st_write(nbhd_sq, "nbhd2.sqlite")
   
   # Making the squares
   pixls_crs <- pixls_sf %>% 
@@ -36,36 +39,42 @@ make_pixels_df <- function(pixl_diameter, share_land_for_dest, total_pop, dwelli
     as.data.frame() %>% 
     purrr::pmap(function(X,Y){
        outer <- c(X, Y) %>% 
-         rbind(c(X+pixl_diameter, Y)) %>% 
-         rbind(c(X+pixl_diameter, Y+pixl_diameter)) %>% 
-         rbind(c(X, Y+pixl_diameter)) %>% 
+         rbind(c(X+pxl_d, Y)) %>% 
+         rbind(c(X+pxl_d, Y+pxl_d)) %>% 
+         rbind(c(X, Y+pxl_d)) %>% 
          rbind(c(X, Y))
       return(st_polygon(list(outer)))
     }) %>% 
     st_as_sfc() %>% 
     as.data.frame()
   
+  pixls_centres <- pixls_crs %>% 
+    mutate(ID = row_number()) %>% 
+    st_as_sf() %>% 
+    st_centroid() %>% 
+    st_join(nbhd_sq, largest = T)
+  
   pixls_sq <- pixls_sf %>% 
     st_drop_geometry() %>% 
     mutate(ID = row_number()) %>% 
+    left_join(st_drop_geometry(pixls_centres)) %>% 
     cbind(pixls_crs) %>% 
     dplyr::select(ID, NBHD_ID, dist_to_centre, geometry) %>% 
     st_as_sf()
-  
   
   # plot(pixls_sq)
   # points <- st_coordinates(pixls_sf) %>% as.data.frame()
   # 
   # pixls_crs <- purrr::pmap(points, function(X,Y){       
-  #outer <- c(X+(pixl_diameter/2), Y-(pixl_diameter/2)) %>% 
-  #  rbind(c(X-(pixl_diameter/2), Y-(pixl_diameter/2))) %>% 
-  #  rbind(c(X-(pixl_diameter/2), Y+(pixl_diameter/2))) %>% 
-  #  rbind(c(X+(pixl_diameter/2), Y+(pixl_diameter/2))) %>% 
-  #  rbind(c(X+(pixl_diameter/2), Y-(pixl_diameter/2)))
+  #outer <- c(X+(pxl_d/2), Y-(pxl_d/2)) %>% 
+  #  rbind(c(X-(pxl_d/2), Y-(pxl_d/2))) %>% 
+  #  rbind(c(X-(pxl_d/2), Y+(pxl_d/2))) %>% 
+  #  rbind(c(X+(pxl_d/2), Y+(pxl_d/2))) %>% 
+  #  rbind(c(X+(pxl_d/2), Y-(pxl_d/2)))
   #   outer <- c(X, Y) %>% 
-  #     rbind(c(X+pixl_diameter, Y)) %>% 
-  #     rbind(c(X+pixl_diameter, Y+pixl_diameter)) %>% 
-  #     rbind(c(X, Y+pixl_diameter)) %>% 
+  #     rbind(c(X+pxl_d, Y)) %>% 
+  #     rbind(c(X+pxl_d, Y+pxl_d)) %>% 
+  #     rbind(c(X, Y+pxl_d)) %>% 
   #     rbind(c(X, Y))
   #   return(st_polygon(list(outer)))
   # }) %>% st_as_sfc() %>% as.data.frame()

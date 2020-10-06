@@ -1,37 +1,38 @@
-
-
-make_nbhds <- function(nbhd_diameter){
-  # CALCUALTING NUMBER OF NEIGHBOURHOODS
-  nbhd <- read_csv("../inputs/neighbourhoods.csv")
+make_nbhds <- function(nbhd_d, nbhd_n){
+  c <- ceiling(sqrt(nbhd_n)/2) # c is the number of diameters at each dir from centre to create the study area
+  nbhds <- tibble(.rows = 2*c*2*c)
   
-
-  nbhd_sf <- nbhd %>% 
-    st_as_sf(coords=c("x","y"), remove=F) %>% 
+  start_x<- -nbhd_d/2 + c*nbhd_d
+  start_y <- -nbhd_d/2 + c*nbhd_d
+  nbhd_sf <- expand.grid(x = seq(from = start_x, by = -nbhd_d, l = 2*c),
+                        y = seq(from = start_y, by = -nbhd_d, l = 2*c)) %>%
+    st_as_sf(coords=c("x","y"))  %>% 
     mutate(dist_to_centre=as.numeric(st_distance(.,st_point(c(0.0,0.0))))) %>% 
-    arrange(dist_to_centre)
-  
-  # plot(nbhd_sf)
-  
+    arrange(dist_to_centre) %>% 
+    mutate(ID=row_number())
+    
   nbhd_crs <- nbhd_sf %>% 
     st_coordinates() %>% 
     as.data.frame() %>% 
     purrr::pmap(function(X,Y){
-      outer <- c(X+(nbhd_diameter/2), Y-(nbhd_diameter/2)) %>% 
-        rbind(c(X-(nbhd_diameter/2), Y-(nbhd_diameter/2))) %>% 
-        rbind(c(X-(nbhd_diameter/2), Y+(nbhd_diameter/2))) %>% 
-        rbind(c(X+(nbhd_diameter/2), Y+(nbhd_diameter/2))) %>% 
-        rbind(c(X+(nbhd_diameter/2), Y-(nbhd_diameter/2)))
+      outer <- c(X+(nbhd_d/2), Y-(nbhd_d/2)) %>% 
+        rbind(c(X-(nbhd_d/2), Y-(nbhd_d/2))) %>% 
+        rbind(c(X-(nbhd_d/2), Y+(nbhd_d/2))) %>% 
+        rbind(c(X+(nbhd_d/2), Y+(nbhd_d/2))) %>% 
+        rbind(c(X+(nbhd_d/2), Y-(nbhd_d/2)))
       return(st_polygon(list(outer)))
     }) %>% 
     st_as_sfc() %>% 
-    as.data.frame()
+    as.data.frame()  
   
   nbhd_sq <- nbhd_sf %>% 
     st_drop_geometry() %>% 
     cbind(nbhd_crs) %>% 
     dplyr::select(NBHD_ID=ID, geometry) %>% 
     st_as_sf()
-  #plot(nbhd_sq["geometry"])
-  return(nbhd_sq)
   
+  #plot(nbhd_crs)
+  #plot(griddf, add= T)
+  #plot(st_point(c(0,0)), add= T, col="red")
+  return(nbhd_sq)
 }
