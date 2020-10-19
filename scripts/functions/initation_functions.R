@@ -6,7 +6,7 @@ make_decsion_df<-function(init_loc,init_dest){
       select(loc_id, x, y, position) %>%
       mutate(dest_type_id = init_dest$dest_type_id[i]) %>%
       mutate(dest_id = paste(loc_id,dest_type_id, sep = "_")) %>%
-      mutate(num_open = 0, total_pop_cap = 0, remaining_pop_cap = 0)%>%
+      mutate(num_open = 0, pop_total = 0, pop_remainder = 0)%>%
       mutate("dist_in_20_min" =  init_dest$dist_in_20_min[i])
     
     #temp_matrix <- matrix(rep(init_dest$dest_type_id[i], numReps), ncol=1)
