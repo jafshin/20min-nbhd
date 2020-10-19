@@ -176,15 +176,6 @@ for (dph in densities){ # iterating over densities
       # FIRST destination OF TYPE iter_dest_row is also going through the evolutionary process
       # Repeating the process until all neighborhoods are served
       error_counter <- 0
-      
-      get_unsrvd_pop <- function(iter_pixls, iter_dest_type){
-        unsrvd <- iter_pixls %>% 
-          dplyr::select(paste("not_served_by_", iter_dest_type, sep = "")) %>% 
-          st_drop_geometry() %>% 
-          sum()
-        return(unsrvd)
-      } 
-
       while(get_unsrvd_pop(iter_pixls, iter_dest_type) > pop*(1-catchment_treshold)){ # loop until everyone are served
         # CREATING A LIST OF DIFFERENT LOCATIONS AND THEIR POTENTIAL CATCHMENTS
         feasible_locs <- find_feasible_locs(iter_deci, iter_pixls,

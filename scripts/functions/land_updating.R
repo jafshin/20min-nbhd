@@ -1,4 +1,13 @@
 
+# Function to get number of unserved population per pixel/dest ------------
+get_unsrvd_pop <- function(iter_pixls, iter_dest_type){
+  unsrvd <- iter_pixls %>% 
+    dplyr::select(paste("not_served_by_", iter_dest_type, sep = "")) %>% 
+    st_drop_geometry() %>% 
+    sum()
+  return(unsrvd)
+} 
+
 # Function to add destination to decision points --------------------------
 add_destination_to_decision <- function(iter_deci,new_deci_row,iter_dest_type){
   iter_deci$num_open[new_deci_row] <- iter_deci$num_open[new_deci_row] + 1
