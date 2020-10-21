@@ -46,7 +46,7 @@ check_total_land <- function(land_to_occupy,loc_nbhds,iter_nbhds){
     nbhd_row <- which(iter_nbhds$NBHD_ID == this_nbhd)
     total_land_in_nbhds <- total_land_in_nbhds + iter_nbhds$remaining_land_for_dest[nbhd_row]
   }
-  if(total_land_in_nbhds < land_to_occupy) print(FALSE) else print(TRUE)
+  if(total_land_in_nbhds < land_to_occupy) return(FALSE) else return(TRUE)
 }
 
 
@@ -81,7 +81,7 @@ find_feasible_locs <- function(this_iter_deci, this_iter_pixls, this_iter_dest,
   # a function to find feasible decision locations, we need this to limit the search space
   # The idea here is to for each location, to find a potential catchment
   # so it will limit the search space for the program
-  # potential catchment is considered as the 1.5* the 20 min access
+  # potential catchment is considered as the 20 min access
   
   #this_iter_deci <- iter_deci
   #this_iter_pixls <- iter_pixls
@@ -92,22 +92,21 @@ find_feasible_locs <- function(this_iter_deci, this_iter_pixls, this_iter_dest,
     filter(dest_type_id == iter_dest_type) 
   
   # potential catchment (based on having less than 20 minutes access)
-  #i <- 113
+  #i <- 85
   for (i in 1:nrow(feasible_locs)){
     feasible_pxls <- feasible_locs[i,] %>% 
-      st_buffer(as.numeric(feasible_locs[i,"dist_in_20_min"])) %>% 
-      st_intersects(iter_pixls) %>% 
-      unlist()
-    
+      st_buffer(as.numeric(st_drop_geometry(feasible_locs[i,"dist_in_20_min"]))) %>% 
+      st_intersects(st_centroid(iter_pixls),sparse = F)
+
     if(length(feasible_pxls)>0){
-      catchment_potential <- this_iter_pixls %>% 
+      catchment_potential <- this_iter_pixls[feasible_pxls,] %>% 
         st_drop_geometry() %>% 
-        filter(ID %in% feasible_pxls) %>%  
         select(notServedPop=paste0("not_served_by_", iter_dest_type)) %>%  
         summarise(total=sum(notServedPop)) %>% 
         as.numeric()
     }else catchment_potential <- 0
     
+    #
     feasible_locs$catchment_potential[i] <- min(this_iter_dest$pop_req[this_iter_dest_row], 
                                                 catchment_potential) 
   }
