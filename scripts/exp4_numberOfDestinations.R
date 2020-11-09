@@ -1,5 +1,6 @@
 # TODO Make it move to the next iteration if the best score didn't changed after 15 iterations
 # TODO plot change in score over time too
+# TODO consider the locations when selecting
 
 #### NEIGHBOURHOOD FACILTIY LOCATION OPTIMISATION #### 
 # 
@@ -29,7 +30,7 @@ source("./functions/make_locations.R")
 pphh <- 2.6 # person per household
 pop <- 30000 # total population
 mutation_p <- 0.20 # mutate rate for optimistaion
-total_iters <- 5 # number of iterations
+total_iters <- 25 # number of iterations
 share_land_for_dest <- 0.35 # share of land for dest
 share_land_for_resid <- 0.7 # share of land for residentials
 pxl_d <- 0.2 # pixel diameter
@@ -39,10 +40,10 @@ consider_categories <- FALSE # TODO make this to work
 densities <- seq(from = 15, to = 45, by = 10) # dwelling per hectar
 
 # Setting up folders ------------------------------------------------------
-output_dir <- "../outputs/Oct26/" # CHANGE THIS FOR DIFFERENT RUNS
+output_dir <- "../outputs/Oct26_4/" # CHANGE THIS FOR DIFFERENT RUNS
 ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
 
-output_deci_dir <- "../outputs/Oct26/decisions" # CHANGE THIS FOR DIFFERENT RUNS
+output_deci_dir <- paste0(output_dir,"decisions") # CHANGE THIS FOR DIFFERENT RUNS
 ifelse(!dir.exists(output_deci_dir), dir.create(output_deci_dir), FALSE)
 
 total_scores_file <- paste(output_dir, "score_summary.csv", sep = "")
@@ -63,7 +64,7 @@ for (dph in densities){ # iterating over densities
   cat(paste("Dweling Density", dph, sep = ","),  file = log_file, append = TRUE, sep="\n")
   cat(paste("***********", "***********", sep = ","),  file = log_file, append = TRUE, sep="\n")
   
-  init_dest <- read.csv("../inputs/destinations_v3.csv") # list of destinations - from VPA
+  init_dest <- read.csv("../inputs/destinations_v4.csv") # list of destinations - from VPA
 
   # Creating the neighbourhoods ---------------------------------------------
   # nbhds are considered as squares 
@@ -115,8 +116,9 @@ for (dph in densities){ # iterating over densities
   # Creating the decision dataframe -----------------------------------------
   init_deci <- make_decsion_df(init_loc,init_dest) %>% 
     st_as_sf(coords=c("x","y"), remove=F) 
-  #plot(init_deci)
-  
+  # plot(init_deci)
+  # st_write(init_deci, "init_deci.sqlite")
+  # st_write(init_pixls, "init_pixls.sqlite")
   # Calculating distances between selection points --------------------------
   for (j in 1:nrow(init_pixls)){
     new_col_name <- paste0("distance_to_",as.character(init_pixls$ID[j]))
@@ -175,6 +177,7 @@ for (dph in densities){ # iterating over densities
     for(iter_dest_row in 1:nrow(iter_dest)){
       unavail_decisions <- 0 # TODO check what is this
       iter_dest_type <- iter_dest$dest_type_id[iter_dest_row] # getting the dest type
+      iter_dest_position <- iter_dest$position[iter_dest_row] # getting the dest type
       print(paste("destination:",iter_dest_type,"; iteration:",iter,
                   "; dwelling denisty:",dph,sep = " "))
 
@@ -184,7 +187,7 @@ for (dph in densities){ # iterating over densities
       while(get_unsrvd_pop(iter_pixls, iter_dest_type) > pop*(1-catchment_treshold)){ # loop until everyone are served
         # CREATING A LIST OF DIFFERENT LOCATIONS AND THEIR POTENTIAL CATCHMENTS
         feasible_locs <- find_feasible_locs(iter_deci, iter_pixls,
-                                            iter_dest, iter_dest_row)
+                                            iter_dest, iter_dest_row,iter_dest_position)
         
         #st_write(iter_deci, "iter_deci.sqlite", delete_layer = T)
         #st_write(iter_pixls, "iter_pixls.sqlite", delete_layer = T)
@@ -352,16 +355,15 @@ for (dph in densities){ # iterating over densities
   # decision writing
   decision %>% 
     mutate(density = dph) %>% 
-    st_write(paste0(output_deci_dir,"/decision_D",dph,".sqlite"),delete_layer=T)
+    st_write(paste0(output_deci_dir,"/D",dph,".sqlite"),layer="decision",delete_layer=T)
   
   pixels_output %>% 
     mutate(density = dph) %>% 
-    st_write(paste0(output_deci_dir,"/pxls_D",dph,".sqlite"),delete_layer=T)
+    st_write(paste0(output_deci_dir,"/D",dph,".sqlite"),layer="pixels",delete_layer=T)
   
   neighbourhood_output %>% 
     mutate(density = dph) %>% 
-    st_write(paste0(output_deci_dir,"/nbhd_D",dph,".sqlite"),delete_layer=T)
-  
+    st_write(paste0(output_deci_dir,"/D",dph,".sqlite"),layer="nbhd",delete_layer=T)
 }
 
 #write.csv(total_score_df,file = total_scores_file)

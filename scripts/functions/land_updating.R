@@ -77,7 +77,7 @@ occupy_land <- function(this_loc_nbhds, iter_nbhds, land_to_occupy,
 
 # Feasible Location Finder ------------------------------------------------
 find_feasible_locs <- function(this_iter_deci, this_iter_pixls, this_iter_dest, 
-                               this_iter_dest_row){
+                               this_iter_dest_row,iter_dest_position){
   # a function to find feasible decision locations, we need this to limit the search space
   # The idea here is to for each location, to find a potential catchment
   # so it will limit the search space for the program
@@ -89,7 +89,7 @@ find_feasible_locs <- function(this_iter_deci, this_iter_pixls, this_iter_dest,
   #this_iter_dest_row <- iter_dest_row
   
   feasible_locs <- this_iter_deci %>% # getting all the decision points for this dest
-    filter(dest_type_id == iter_dest_type) 
+    filter(dest_type_id == iter_dest_type & position==iter_dest_position) 
   
   # potential catchment (based on having less than 20 minutes access)
   #i <- 85
