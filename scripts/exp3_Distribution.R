@@ -27,15 +27,14 @@ source("./functions/make_locations.R")
 pphh <- 2.6 # person per household
 pop <- 60000 # total population
 mutation_p <- 0.20 # mutate rate for optimization
-total_iters <- 25 # number of iterations
+iters_max <- 25 # max number of iterations
+convergenceIterations <- 5
 share_land_for_dest <- 0.35 # share of land for dest
 share_land_for_resid <- 0.7 # share of land for residential
 pxl_d <- 0.2 # pixel diameter
 nbhd_d <- 1.6 # neighbourhood diameter
-catchment_treshold <- 0.8 # TODO make this dependent on the destination type
 consider_categories <- FALSE 
 densities <- seq(from = 15, to = 45, by = 10) # dwelling per hectare
-convergenceIterations <- 5
 # Setting up folders ------------------------------------------------------
 output_dir <- "../outputs/Exp3_Nov9_1732/" # CHANGE THIS FOR DIFFERENT RUNS
 ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
@@ -159,7 +158,7 @@ for (dph in densities){ # iterating over densities
   decision <- init_deci 
   iter <- 1
   convergenceCounter <- 0
-  while(iter < total_iters + 1){
+  while(iter < iters_max + 1){
     print(paste("############## iteration number",iter, sep = ":"))
     
     # A set of temp DFs for iterations
@@ -186,7 +185,7 @@ for (dph in densities){ # iterating over densities
       # Repeating the process until all neighborhoods are served
       error_counter <- 0
       remaining_num_dests <- iter_dest$num_dests[iter_dest_row]
-      while((get_unsrvd_pop(iter_pixls, iter_dest_type) > pop*(1-catchment_treshold)) & (remaining_num_dests > 0)){ # loop until all are served AND we have destinations to use
+      while((get_unsrvd_pop(iter_pixls, iter_dest_type) > pop*(1-iter_dest$coverage[iter_dest_row])) & (remaining_num_dests > 0)){ # loop until all are served AND we have destinations to use
         # CREATING A LIST OF DIFFERENT LOCATIONS AND THEIR POTENTIAL CATCHMENTS
         feasible_locs <- find_feasible_locs(iter_deci, iter_pixls,
                                             iter_dest, iter_dest_row,
