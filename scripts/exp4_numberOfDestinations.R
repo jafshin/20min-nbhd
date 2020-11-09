@@ -359,6 +359,7 @@ for (dph in densities){ # iterating over densities
   # decision writing
   decision %>% 
     mutate(density = dph) %>% 
+    dplyr::select(-starts_with("distance")) %>% 
     st_write(paste0(output_deci_dir,"/D",dph,".sqlite"),layer="decision",delete_layer=T)
   
   pixels_output %>% 
