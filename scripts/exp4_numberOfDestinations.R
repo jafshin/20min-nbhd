@@ -9,7 +9,6 @@
 #
 # @author AJ
 
-
 # Packages ----------------------------------------------------------------
 library(rdist)
 library(dplyr)
@@ -29,18 +28,18 @@ source("./functions/make_locations.R")
 # Setting initial parameters ----------------------------------------------
 pphh <- 2.6 # person per household
 pop <- 30000 # total population
-mutation_p <- 0.20 # mutate rate for optimistaion
+mutation_p <- 0.20 # mutate rate for optimization
 total_iters <- 25 # number of iterations
 share_land_for_dest <- 0.35 # share of land for dest
-share_land_for_resid <- 0.7 # share of land for residentials
+share_land_for_resid <- 0.7 # share of land for residential
 pxl_d <- 0.2 # pixel diameter
 nbhd_d <- 1.6 # neighbourhood diameter
 catchment_treshold <- 0.8 # TODO make this dependent on the destination type
 consider_categories <- FALSE # TODO make this to work
-densities <- seq(from = 15, to = 45, by = 10) # dwelling per hectar
-
+densities <- seq(from = 15, to = 45, by = 10) # dwelling per hectare
+convergenceIterations <- 5
 # Setting up folders ------------------------------------------------------
-output_dir <- "../outputs/Oct26_4/" # CHANGE THIS FOR DIFFERENT RUNS
+output_dir <- "../outputs/Nov9_1500/" # CHANGE THIS FOR DIFFERENT RUNS
 ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
 
 output_deci_dir <- paste0(output_dir,"decisions") # CHANGE THIS FOR DIFFERENT RUNS
@@ -65,7 +64,7 @@ for (dph in densities){ # iterating over densities
   cat(paste("***********", "***********", sep = ","),  file = log_file, append = TRUE, sep="\n")
   
   init_dest <- read.csv("../inputs/destinations_v4.csv") # list of destinations - from VPA
-
+  # init_dest <- init_dest[1:4,]
   # Creating the neighbourhoods ---------------------------------------------
   # nbhds are considered as squares 
   nbhd_dev_area <- nbhd_d^2 * share_land_for_resid # land for development per nbhd
@@ -158,6 +157,7 @@ for (dph in densities){ # iterating over densities
 
   decision <- init_deci 
   iter <- 1
+  convergenceCounter <- 0
   while(iter < total_iters + 1){
     print(paste("############## iteration number",iter, sep = ":"))
     
@@ -296,7 +296,6 @@ for (dph in densities){ # iterating over densities
               iter_deci[new_deci_row, deci_col] <- 1
             }
           }
-        
         }
         }
       if(No_Answer_flag){
@@ -323,26 +322,33 @@ for (dph in densities){ # iterating over densities
     cat(paste("Iteration,",iter, sep = ","),file=log_file,append=TRUE, sep="\n")
     cat(paste("Iteration_Score,",iter_score, sep = ","),file=log_file,append=TRUE, sep="\n")
     cat(paste("Iteration_result,",iter_score, sep = ","),file=log_file,append=TRUE, sep="\n")
-    # Checking if it is a new best result
     
+    # Checking if it is a new best result
     if(iter_score > score){
+      convergenceCounter <- 0
       score <- iter_score
       decision <- iter_deci
       neighbourhood_output <- iter_nbhds 
       pixels_output <- iter_pixls
       cat(paste("Iteration_result,","NEW_BEST_SCORE", sep = ","),file=log_file,append=TRUE, sep="\n")
       #cat(paste("new_Best_Score,",score, sep = ","),file=log_file,append=TRUE, sep="\n")
-      print(paste("new_Best_Score,",score, sep = ","))
+      print(paste0("new_Best_Score, ",score))
     }else if(land_flag){
       cat(paste("Iteration_result,","NO_SPACE", sep = ","),file=log_file,append=TRUE, sep="\n")
     }else if(No_Answer_flag){
       cat(paste("Iteration_result,","NO_SPACE", sep = ","),file=log_file,append=TRUE, sep="\n")
     }else{
+      print("iteration score not changed")
+      convergenceCounter <- convergenceCounter + 1
+      print(paste0("convergence counter: ", convergenceCounter))
       cat(paste("Iteration_result,","NORMAL", sep = ","),file=log_file,append=TRUE, sep="\n")
     }
     cat("******, ******",file=log_file,append=TRUE, sep="\n")
+    if(convergenceCounter>convergenceIterations){
+      print(paste0("Skipping the rest, model seems to be converged at iter ", iter))
+      break
+    } 
     iter <- iter + 1
-    
   }
   # Writing some of the inputs
   #write.csv(neighbourhood_output, file = paste(output_sub_dir, "nbhd_", "D", dph, ".csv", sep = ""))
