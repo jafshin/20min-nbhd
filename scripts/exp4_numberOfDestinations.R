@@ -1,6 +1,4 @@
-# TODO Make it move to the next iteration if the best score didn't changed after 15 iterations
 # TODO plot change in score over time too
-# TODO consider the locations when selecting
 
 #### NEIGHBOURHOOD FACILTIY LOCATION OPTIMISATION #### 
 # 
@@ -35,11 +33,11 @@ share_land_for_resid <- 0.7 # share of land for residential
 pxl_d <- 0.2 # pixel diameter
 nbhd_d <- 1.6 # neighbourhood diameter
 catchment_treshold <- 0.8 # TODO make this dependent on the destination type
-consider_categories <- FALSE # TODO make this to work
+consider_categories <- TRUE 
 densities <- seq(from = 15, to = 45, by = 10) # dwelling per hectare
 convergenceIterations <- 5
 # Setting up folders ------------------------------------------------------
-output_dir <- "../outputs/Nov9_1500/" # CHANGE THIS FOR DIFFERENT RUNS
+output_dir <- "../outputs/Exp4_Nov9_1500/" # CHANGE THIS FOR DIFFERENT RUNS
 ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
 
 output_deci_dir <- paste0(output_dir,"decisions") # CHANGE THIS FOR DIFFERENT RUNS
@@ -187,7 +185,8 @@ for (dph in densities){ # iterating over densities
       while(get_unsrvd_pop(iter_pixls, iter_dest_type) > pop*(1-catchment_treshold)){ # loop until everyone are served
         # CREATING A LIST OF DIFFERENT LOCATIONS AND THEIR POTENTIAL CATCHMENTS
         feasible_locs <- find_feasible_locs(iter_deci, iter_pixls,
-                                            iter_dest, iter_dest_row,iter_dest_position)
+                                            iter_dest, iter_dest_row,
+                                            iter_dest_position, consider_categories)
         
         #st_write(iter_deci, "iter_deci.sqlite", delete_layer = T)
         #st_write(iter_pixls, "iter_pixls.sqlite", delete_layer = T)
