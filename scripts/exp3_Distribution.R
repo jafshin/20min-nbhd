@@ -27,7 +27,7 @@ source("./functions/make_locations.R")
 pphh <- 2.6 # person per household
 pop <- 60000 # total population
 mutation_p <- 0.20 # mutate rate for optimization
-iters_max <- 25 # max number of iterations
+iters_max <- 50 # max number of iterations
 convergenceIterations <- 5
 share_land_for_dest <- 0.35 # share of land for dest
 share_land_for_resid <- 0.7 # share of land for residential
@@ -36,7 +36,7 @@ nbhd_d <- 1.6 # neighbourhood diameter
 consider_categories <- FALSE 
 densities <- seq(from = 15, to = 45, by = 10) # dwelling per hectare
 # Setting up folders ------------------------------------------------------
-output_dir <- "../outputs/Exp3_Nov9_1732/" # CHANGE THIS FOR DIFFERENT RUNS
+output_dir <- "../outputs/Exp3_Nov16_1301/" # CHANGE THIS FOR DIFFERENT RUNS
 ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
 
 output_deci_dir <- paste0(output_dir,"decisions") # CHANGE THIS FOR DIFFERENT RUNS
@@ -63,7 +63,6 @@ for (dph in densities){ # iterating over densities
   #  Destinations -----------------------------------------------------------
   init_dest <- read.csv("../inputs/destinations_v4.csv") %>%  # list of destinations - from VPA
     mutate(dist_in_20_min=dist_in_20_min/coverage)
-  
   # init_dest <- init_dest[1:4,]
   # How many of each destination needed
   init_dest <- init_dest %>% 
@@ -73,9 +72,7 @@ for (dph in densities){ # iterating over densities
   # nbhds are considered as squares 
   nbhd_dev_area <- nbhd_d^2 * share_land_for_resid # land for development per nbhd
   nbhd_n <- ceiling(pop * 0.01 / (dph * pphh * nbhd_dev_area)) # number of nbhds
-  #nbhd_p <- round(pop / nbhd_n) # population per nbhds
   nbhd_sq <- make_nbhds(nbhd_d, nbhd_n) # nbhds with geometries
-  #plot(nbhd_sq)
   study_area_d <- nbhd_d * (ceiling(sqrt(nbhd_n))+1) # Dimensions of the study area
   nbhd_sq <- nbhd_sq %>% # Adding Land for destinations as a var to nbhds
     mutate(land_for_dest = nbhd_d^2 * share_land_for_dest) %>% 
@@ -87,7 +84,6 @@ for (dph in densities){ # iterating over densities
   pxl_n <- ceiling(pop * 0.01 / (dph * pphh * pxl_dev_a))
   init_pixls <- make_pixels_df(pxl_d, share_land_for_dest, pop, dph, 
                                pphh, study_area_d, nbhd_sq) # creating pixles
-  #init_pixls <- distribute_population(avg_px_pop, nbhd_sq, init_pixls, pop, init_dest)
   avg_px_pop <- ceiling (pop / pxl_n) # Assuming homogeneous population distribution
   remaining_population <- pop 
   for (nb in nbhd_sq$NBHD_ID) { # populating the pixles
@@ -98,10 +94,6 @@ for (dph in densities){ # iterating over densities
     }
   }
   init_pixls <- init_pixls %>% filter(pop > 0) # Just keeping the pixels with pop
-  #plot(init_pixls)
-  #plot(init_pixls)
-  #st_write(init_pixls, "pxl.sqlite", delete_layer =  T)
-  #st_write(nbhd_sq, "nbhd.sqlite", delete_layer =  T)
   
   # Joining nbhds and pixels ------------------------------------------------
   nbhd_sq <- init_pixls %>%
@@ -192,15 +184,8 @@ for (dph in densities){ # iterating over densities
         feasible_locs <- find_feasible_locs(iter_deci, iter_pixls,
                                             iter_dest, iter_dest_row,
                                             iter_dest_position, consider_categories)
-        
-        #st_write(iter_deci, "iter_deci.sqlite", delete_layer = T)
-        #st_write(iter_pixls, "iter_pixls.sqlite", delete_layer = T)
-        
         feasible_locs <- feasible_locs %>%
           filter(!(dest_id %in% unavail_decisions))
-        
-        #st_write(feasible_locs, "feasibleLocs.sqlite", delete_layer = T)
-        
         if(nrow(feasible_locs)==0){
           print("No Answer")
           No_Answer_flag <- TRUE
@@ -232,7 +217,6 @@ for (dph in densities){ # iterating over densities
         land_to_occupy <- iter_dest$land_req[which(iter_dest$dest_type_id == iter_deci$dest_type_id[new_deci_row])]
         
         if(!check_total_land(land_to_occupy,loc_nbhds,iter_nbhds)){
-          #print("SPACE")
           error_counter <- error_counter + 1
           unavail_decisions <- c(unavail_decisions, new_dest_id)
           if(error_counter > 100){
@@ -250,8 +234,7 @@ for (dph in densities){ # iterating over densities
           iter_nbhds <- occupy_land(loc_nbhds, iter_nbhds, land_to_occupy)
           # Updating number of remaining destinations
           remaining_num_dests <- remaining_num_dests - 1
-          print(paste0("Number of remaining destinations to open: ", remaining_num_dests))
-          
+
           # SERVING THE NEIGHBOURS  -------------------------------------------
           # finding those closest to this
           close_pxls_id <- iter_deci[new_deci_row,] %>% 
@@ -268,7 +251,6 @@ for (dph in densities){ # iterating over densities
           
           # Add a check here for if there are unserved pop in the close pxls
           for (i in 1:nrow(close_pxls)) {
-            #temp_dist <- as.double(dists_ord[i])
             temp_pixl_id <- st_drop_geometry(close_pxls[i,"ID"]) %>% 
               as.numeric()
             temp_pixl_row <- which(iter_pixls$ID==temp_pixl_id)
@@ -299,7 +281,6 @@ for (dph in densities){ # iterating over densities
       }
     
     # Scoring and best solution selection -------------------------------------
-    
     if(land_flag){
       print("I AM HERE")
       iter_score <- nrow(init_deci) * (200)
@@ -351,13 +332,9 @@ for (dph in densities){ # iterating over densities
     } 
     iter <- iter + 1
   }
-  # Writing some of the inputs
-  #write.csv(neighbourhood_output, file = paste(output_sub_dir, "nbhd_", "D", dph, ".csv", sep = ""))
-  #write.csv(pixels_output, file = paste(output_sub_dir, "pixls", "D", dph, ".csv", sep = ""))
   # writing outputs 
   cat(paste("Final_best_score", score, sep = ","),file=log_file,append=TRUE, sep="\n")
   total_score_df$score[which(total_score_df$density == dph)] <- score
-  #write.csv(decision, file = output_file)
 
   # decision writing
   decision %>% 
@@ -373,12 +350,3 @@ for (dph in densities){ # iterating over densities
     mutate(density = dph) %>% 
     st_write(paste0(output_deci_dir,"/D",dph,".sqlite"),layer="nbhd",delete_layer=T)
 }
-
-#write.csv(total_score_df,file = total_scores_file)
-#summerise_destinations(densities, output_dir)
-#plot_scores(total_score_df)
-#plot_destinations()
-
-
-
-
