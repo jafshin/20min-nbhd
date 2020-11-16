@@ -61,7 +61,9 @@ for (dph in densities){ # iterating over densities
   cat(paste0("***********,", "***********"),  file = log_file, append = TRUE, sep="\n")
   
   #  Destinations -----------------------------------------------------------
-  init_dest <- read.csv("../inputs/destinations_v4.csv") # list of destinations - from VPA
+  init_dest <- read.csv("../inputs/destinations_v4.csv") %>%  # list of destinations - from VPA
+    mutate(dist_in_20_min=dist_in_20_min/coverage)
+  
   # init_dest <- init_dest[1:4,]
   # How many of each destination needed
   init_dest <- init_dest %>% 
@@ -148,7 +150,7 @@ for (dph in densities){ # iterating over densities
   }
   
   # Evolutionary optimisation -----------------------------------------------
-  score <- 100 # Assuming the worst score when no one is served (100%)
+  score <- 200 # Assuming the worst score when no one is served (100%) + no capacity used (100% free capacity)
   #scoring_denom <- init_dest %>% select(pop_req) %>% colSums(na.rm = TRUE) %>% as.integer()
   init_deci <- init_deci %>%
     left_join(init_dest[,c("dest_type_id","pop_land_weigh")], 
@@ -294,23 +296,30 @@ for (dph in densities){ # iterating over densities
         break;
       }
       iter_dest[iter_dest_row, "pop_unsrvd"] <- get_unsrvd_pop(iter_pixls, iter_dest_type)
-      
       }
     
     # Scoring and best solution selection -------------------------------------
     
     if(land_flag){
       print("I AM HERE")
-      iter_score <- nrow(init_deci) * (-100)
+      iter_score <- nrow(init_deci) * (200)
     }else if(No_Answer_flag){
       print("I AM HERE 2")
-      iter_score <- nrow(init_deci) * (-100)
+      iter_score <- nrow(init_deci) * (200)
     }
     else{
-      iter_score <- 100*(sum(iter_dest$pop_unsrvd)/(pop*nrow(iter_dest))) 
-      if(is.na(iter_score)) iter_score=100
+      deci_score <- iter_deci %>% 
+        st_drop_geometry() %>% 
+        filter(pop_total > 0) %>%
+        summarise(tpr = sum(pop_remainder), tp=sum(pop_total)) %>%
+        summarise(100*tpr/tp) %>% 
+        as.double()
+      iter_score <- 100*(sum(iter_dest$pop_unsrvd, 
+                             na.rm = T)/(pop*nrow(iter_dest[!is.na(iter_dest$pop_unsrvd),]))) +
+        deci_score
+      if(is.na(iter_score)) iter_score=200
     }
-    
+      
     cat(paste("Iteration,",iter, sep = ","),file=log_file,append=TRUE, sep="\n")
     cat(paste("Iteration_Score,",iter_score, sep = ","),file=log_file,append=TRUE, sep="\n")
     cat(paste("Iteration_result,",iter_score, sep = ","),file=log_file,append=TRUE, sep="\n")
