@@ -1,37 +1,49 @@
 
 # Function to get number of unserved population per pixel/dest ------------
-get_unsrvd_pop <- function(iter_pixls, iter_dest_type){
+get_unsrvd_pop <- function(iter_pixls, iter_dest_code){
   unsrvd <- iter_pixls %>% 
-    dplyr::select(paste("not_served_by_", iter_dest_type, sep = "")) %>% 
+    dplyr::select(paste("not_served_by_", iter_dest_code, sep = "")) %>% 
     st_drop_geometry() %>% 
     sum()
   return(unsrvd)
 } 
 
 # Function to add destination to decision points --------------------------
-add_destination_to_decision <- function(iter_deci,new_deci_row,iter_dest_type){
-  iter_deci$num_open[new_deci_row] <- iter_deci$num_open[new_deci_row] + 1
-  new_capacity <- iter_dest$pop_req[which(iter_dest$dest_type_id == iter_dest_type)]
-  iter_deci$pop_total[new_deci_row] <- iter_deci$pop_total[new_deci_row] + new_capacity
-  iter_deci$pop_remainder[new_deci_row] <- iter_deci$pop_remainder[new_deci_row] + new_capacity
+add_destination_to_decision <- function(iter_deci,new_deci_row,iter_dest_code){
+  loc_col <- paste0("num_dest_", iter_dest_code)
+  iter_deci[new_deci_row,loc_col] <- st_drop_geometry(iter_deci[new_deci_row,loc_col]) + 1
+  new_capacity <- iter_dest$pop_req[which(iter_dest$dest_type_id == iter_dest_code)]
+  pop_total_col <- paste0("pop_total-",iter_dest_code)
+  iter_deci[new_deci_row,pop_total_col] <- iter_deci[new_deci_row,pop_total_col] + new_capacity
+  pop_remainder_col <- paste0("pop_remaining_",iter_dest_code)
+  iter_deci[new_deci_row,pop_remainder_col] <- iter_deci[new_deci_row,pop_remainder_col] + new_capacity
   return(iter_deci)
 }
 
 
 # Function to add destinations to locations -------------------------------
 add_destination_to_location <- function(iter_loc, iter_deci, 
-                                        new_deci_row, iter_dest_type){
-  loc_row <- which(iter_loc$loc_id == iter_deci$loc_id[new_deci_row])
-  loc_col <- paste("num_dest_", iter_dest_type, sep = "")
-  iter_loc[loc_row, loc_col] <- st_drop_geometry(iter_loc[loc_row, loc_col]) + 1
+                                        new_dest_loc_id, iter_dest_code){
+  
+  loc_row <- which(iter_loc$loc_id == as.integer(new_dest_loc_id))
+  loc_col <- paste0("num_dest_", iter_dest_code)
+  
+  iter_loc[loc_row,loc_col] <- iter_loc[loc_row,loc_col] + 1
+  new_capacity <- iter_dest$pop_req[which(iter_dest$dest_code == iter_dest_code)]
+  pop_total_col <- paste0("pop_total_",iter_dest_code)
+  iter_loc[loc_row,pop_total_col] <- iter_loc[loc_row,pop_total_col] + new_capacity
+  pop_remainder_col <- paste0("pop_remaining_",iter_dest_code)
+  iter_loc[loc_row,pop_remainder_col] <- iter_loc[loc_row,pop_remainder_col] + new_capacity
+  
   return(iter_loc)
 }
 
 
 # Function to find land contributors for each nbhd ------------------------
-find_land_contributors <- function(iter_loc, iter_deci, iter_nbhds, new_deci_row){
-  loc_row <- which(iter_loc$loc_id == iter_deci$loc_id[new_deci_row])
+find_land_contributors <- function(iter_loc, new_dest_loc_id, iter_nbhds){
+  loc_row <- which(iter_loc$loc_id == new_dest_loc_id)
   loc_nbhds <- iter_loc[loc_row,] %>% # Getting the nbhd intersecting with loc
+    st_as_sf(coords=c("x","y"),remove=F) %>% 
     st_buffer(0.1) %>% 
     st_intersects(iter_nbhds)
   loc_nbhds <- loc_nbhds[!is.na(loc_nbhds)]
@@ -76,8 +88,8 @@ occupy_land <- function(this_loc_nbhds, iter_nbhds, land_to_occupy,
 }
 
 # Feasible Location Finder ------------------------------------------------
-find_feasible_locs <- function(this_iter_deci, this_iter_pixls, this_iter_dest, 
-                               this_iter_dest_row,iter_dest_position,consider_categories){
+find_feasible_locs <- function(iter_loc, iter_pixls, iter_dest, 
+                               iter_dest_row,iter_dest_position,consider_categories){
   # a function to find feasible decision locations, we need this to limit the search space
   # The idea here is to for each location, to find a potential catchment
   # so it will limit the search space for the program
@@ -88,30 +100,39 @@ find_feasible_locs <- function(this_iter_deci, this_iter_pixls, this_iter_dest,
   #this_iter_dest <- iter_dest
   #this_iter_dest_row <- iter_dest_row
   if(consider_categories){
-    feasible_locs <- this_iter_deci %>% # getting all the decision points for this dest
-      filter(dest_type_id == iter_dest_type & position==iter_dest_position) 
+    if(iter_dest_position%in%c("ltc","nltc","etc")){
+      feasible_locs <- iter_loc %>% # getting all the decision points for this dest
+        filter(position==iter_dest_position) 
+    }else{
+      dest_col_name <- paste0("num_dest_",iter_dest_position)
+      feasible_locs <- iter_loc[which(iter_loc[,dest_col_name]>0),]
+    }
+    #feasible_locs <- this_iter_deci %>% # getting all the decision points for this dest
+    #  filter(dest_type_id == iter_dest_code & position==iter_dest_position) 
   }else{
-    feasible_locs <- this_iter_deci %>% # getting all the decision points for this dest
-      filter(dest_type_id == iter_dest_type) 
+    #feasible_locs <- this_iter_deci %>% # getting all the decision points for this dest
+    #  filter(dest_type_id == iter_dest_code) 
+    #feasible_locs <- iter_loc %>% # getting all the decision points for this dest
+    #  filter(dest_type_id == iter_dest_code) 
   }
   
   # potential catchment (based on having less than 20 minutes access)
-  #i <- 85
+  #i <- 1
   for (i in 1:nrow(feasible_locs)){
     feasible_pxls <- feasible_locs[i,] %>% 
-      st_buffer(as.numeric(st_drop_geometry(feasible_locs[i,"dist_in_20_min"]))) %>% 
+      st_as_sf(coords=c("x","y")) %>% 
+      st_buffer(as.numeric(iter_dest[iter_dest_row,"dist_in_20_min"])) %>% 
       st_intersects(st_centroid(iter_pixls),sparse = F)
 
     if(length(feasible_pxls)>0){
-      catchment_potential <- this_iter_pixls[feasible_pxls,] %>% 
+      catchment_potential <- iter_pixls[feasible_pxls,] %>% 
         st_drop_geometry() %>% 
-        select(notServedPop=paste0("not_served_by_", iter_dest_type)) %>%  
+        select(notServedPop=paste0("not_served_by_", iter_dest_code)) %>%  
         summarise(total=sum(notServedPop)) %>% 
         as.numeric()
     }else catchment_potential <- 0
     
-    #
-    feasible_locs$catchment_potential[i] <- min(this_iter_dest$pop_req[this_iter_dest_row], 
+    feasible_locs$catchment_potential[i] <- min(iter_dest$pop_req[iter_dest_row], 
                                                 catchment_potential) 
   }
   

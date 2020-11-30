@@ -19,9 +19,9 @@ summerise_destinations <- function(densities, output_dir){
     this_output <- read.csv(output_file, header = TRUE)
     
     dest_df_extended[dest_density_rows,c("num_open","unused_capacity")] <- this_output %>% 
-      select(dest_type_id, num_open, remaining_pop_cap) %>%
+      select(dest_type_id, num_open, pop_remainder) %>%
       group_by(dest_type_id) %>%
-      summarise(total_open = sum(num_open), unused_capacity = sum(remaining_pop_cap)) %>%
+      summarise(total_open = sum(num_open), unused_capacity = sum(pop_remainder)) %>%
       select(total_open, unused_capacity)
   }
   write.csv(dest_df_extended,paste(output_dir, "decision_summary.csv", sep = ""))

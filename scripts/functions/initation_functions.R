@@ -1,18 +1,11 @@
 
-make_decsion_df<-function(init_loc,init_dest){
-  init_deci <- data.frame()
+make_decsion_df<-function(init_loc,init_dest){ # TODO make it efficient
   for (i in 1:nrow(init_dest)){
-    temp_df <- init_loc %>%
-      select(loc_id, x, y, position) %>%
-      mutate(dest_type_id = init_dest$dest_type_id[i]) %>%
-      mutate(dest_id = paste(loc_id,dest_type_id, sep = "_")) %>%
-      mutate(num_open = 0, pop_total = 0, pop_remainder = 0)%>%
-      mutate("dist_in_20_min" =  init_dest$dist_in_20_min[i])
-    
-    #temp_matrix <- matrix(rep(init_dest$dest_type_id[i], numReps), ncol=1)
-    
-    init_deci <- rbind(init_deci, temp_df)
-  }
+    init_deci <- init_loc %>% 
+      mutate(!!paste0("num_dest_", init_dest$dest_type_id[i]):=0) %>% 
+      mutate(!!paste0("pop_total_", init_dest$dest_type_id[i]):=0) %>% 
+      mutate(!!paste0("pop_remaining_", init_dest$dest_type_id[i]):=0)
+    }
   return(init_deci)
 }
 
