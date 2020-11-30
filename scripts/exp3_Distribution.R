@@ -63,7 +63,6 @@ for (dph in densities){ # iterating over densities
   #  Destinations -----------------------------------------------------------
   init_dest <- read.csv("../inputs/destinations_v5.csv") %>%  # list of destinations - from VPA
     mutate(dist_in_20_min=dist_in_20_min/coverage)
-  # init_dest <- init_dest[1:4,]
   # How many of each destination needed
   init_dest <- init_dest %>% 
     mutate(num_dests=ceiling(pop/init_dest$pop_req))
@@ -106,7 +105,6 @@ for (dph in densities){ # iterating over densities
   
   # Creating the locations -------------------------------------------------
   init_loc <- make_locations(nbhd_sq, study_area_d)
-  #plot(init_loc )
   
   # Sorting init dest based on pop_req*land_req
   # meaning starting from those big and high pop destinations
