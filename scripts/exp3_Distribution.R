@@ -33,7 +33,7 @@ share_land_for_dest <- 0.35 # share of land for dest
 share_land_for_resid <- 0.7 # share of land for residential
 pxl_d <- 0.2 # pixel diameter
 nbhd_d <- 1.6 # neighbourhood diameter
-consider_categories <- T 
+consider_categories <- F 
 densities <- seq(from = 15, to = 45, by = 10) # dwelling per hectare
 # Setting up folders ------------------------------------------------------
 output_dir <- "../outputs/Exp3_Nov30_1220/" # CHANGE THIS FOR DIFFERENT RUNS
@@ -125,17 +125,9 @@ for (dph in densities){ # iterating over densities
       mutate(!!paste0("pop_remaining_", dest):=0)
   }
   
-  #init_deci2 <- init_loc
-  
   # Evolutionary optimisation -----------------------------------------------
   score <- 200 # Assuming the worst score when no one is served (100%) + no capacity used (100% free capacity)
-  #scoring_denom <- init_dest %>% select(pop_req) %>% colSums(na.rm = TRUE) %>% as.integer()
-  #init_deci <- init_deci %>%
-  #  left_join(init_dest[,c("dest_code","pop_land_weigh")], 
-  #            by = "dest_code") %>% 
-  #  rename(dest_weight=pop_land_weigh)
   
-  #decision <- init_deci 
   decision <- init_loc 
   iter <- 1
   convergenceCounter <- 0
@@ -213,10 +205,8 @@ for (dph in densities){ # iterating over densities
           }
         }else{
           # Adding the destination to decision and location DFs
-          #iter_deci <- add_destination_to_decision(iter_deci2,new_deci_row,
-          #                                         iter_dest_code)
-          iter_loc <- add_destination_to_location(iter_loc, iter_deci, 
-                                                  new_dest_loc_id, iter_dest_code)
+          iter_loc <- add_destination_to_location(iter_loc, new_dest_loc_id, 
+                                                  iter_dest_code)
           # Occupying the land
           iter_nbhds <- occupy_land(loc_nbhds, iter_nbhds, land_to_occupy)
           # Updating number of remaining destinations
@@ -259,8 +249,6 @@ for (dph in densities){ # iterating over densities
               iter_pixls[temp_pixl_row, paste("not_served_by_", 
                                               iter_dest_code, sep = "")] <- pxls_unsrved_pop - pop2cover
               # adding the destinations to iter deci df
-              #deci_col <- paste0("is_serving_", iter_pixls$ID[temp_pixl_row])
-              #iter_deci[new_deci_row, deci_col] <- 1
             }
           }
         }

@@ -8,22 +8,8 @@ get_unsrvd_pop <- function(iter_pixls, iter_dest_code){
   return(unsrvd)
 } 
 
-# Function to add destination to decision points --------------------------
-add_destination_to_decision <- function(iter_deci,new_deci_row,iter_dest_code){
-  loc_col <- paste0("num_dest_", iter_dest_code)
-  iter_deci[new_deci_row,loc_col] <- st_drop_geometry(iter_deci[new_deci_row,loc_col]) + 1
-  new_capacity <- iter_dest$pop_req[which(iter_dest$dest_type_id == iter_dest_code)]
-  pop_total_col <- paste0("pop_total-",iter_dest_code)
-  iter_deci[new_deci_row,pop_total_col] <- iter_deci[new_deci_row,pop_total_col] + new_capacity
-  pop_remainder_col <- paste0("pop_remaining_",iter_dest_code)
-  iter_deci[new_deci_row,pop_remainder_col] <- iter_deci[new_deci_row,pop_remainder_col] + new_capacity
-  return(iter_deci)
-}
-
-
 # Function to add destinations to locations -------------------------------
-add_destination_to_location <- function(iter_loc, iter_deci, 
-                                        new_dest_loc_id, iter_dest_code){
+add_destination_to_location <- function(iter_loc, new_dest_loc_id, iter_dest_code){
   
   loc_row <- which(iter_loc$loc_id == as.integer(new_dest_loc_id))
   loc_col <- paste0("num_dest_", iter_dest_code)
@@ -61,7 +47,6 @@ check_total_land <- function(land_to_occupy,loc_nbhds,iter_nbhds){
   if(total_land_in_nbhds < land_to_occupy) return(FALSE) else return(TRUE)
 }
 
-
 # Function to occupy land in nbhds ----------------------------------------
 occupy_land <- function(this_loc_nbhds, iter_nbhds, land_to_occupy, 
                         land_to_occupy_per_nbhd){
@@ -95,10 +80,6 @@ find_feasible_locs <- function(iter_loc, iter_pixls, iter_dest,
   # so it will limit the search space for the program
   # potential catchment is considered as the 20 min access
   
-  #this_iter_deci <- iter_deci
-  #this_iter_pixls <- iter_pixls
-  #this_iter_dest <- iter_dest
-  #this_iter_dest_row <- iter_dest_row
   if(consider_categories){
     if(iter_dest_position%in%c("ltc","nltc","etc")){
       feasible_locs <- iter_loc %>% # getting all the decision points for this dest
@@ -107,17 +88,11 @@ find_feasible_locs <- function(iter_loc, iter_pixls, iter_dest,
       dest_col_name <- paste0("num_dest_",iter_dest_position)
       feasible_locs <- iter_loc[which(iter_loc[,dest_col_name]>0),]
     }
-    #feasible_locs <- this_iter_deci %>% # getting all the decision points for this dest
-    #  filter(dest_type_id == iter_dest_code & position==iter_dest_position) 
   }else{
-    #feasible_locs <- this_iter_deci %>% # getting all the decision points for this dest
-    #  filter(dest_type_id == iter_dest_code) 
-    #feasible_locs <- iter_loc %>% # getting all the decision points for this dest
-    #  filter(dest_type_id == iter_dest_code) 
+    feasible_locs <- iter_loc 
   }
   
   # potential catchment (based on having less than 20 minutes access)
-  #i <- 1
   for (i in 1:nrow(feasible_locs)){
     feasible_pxls <- feasible_locs[i,] %>% 
       st_as_sf(coords=c("x","y")) %>% 

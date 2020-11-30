@@ -31,8 +31,5 @@ make_nbhds <- function(nbhd_d, nbhd_n){
     dplyr::select(NBHD_ID=ID, geometry) %>% 
     st_as_sf()
   
-  #plot(nbhd_crs)
-  #plot(griddf, add= T)
-  #plot(st_point(c(0,0)), add= T, col="red")
   return(nbhd_sq)
 }
