@@ -12,6 +12,7 @@ library(rdist)
 library(dplyr)
 library(ggplot2)
 library(sf)
+library(purrr)
 library(readr)
 
 # Functions ---------------------------------------------------------------
@@ -23,46 +24,28 @@ source("./functions/distribute_population.R")
 source("./functions/make_nbhds.R")
 source("./functions/make_locations.R")
 
-# Setting initial parameters ----------------------------------------------
-pphh <- 2.6 # person per household
-pop <- 60000 # total population
-mutation_p <- 0.20 # mutate rate for optimization
-iters_max <- 10 # max number of iterations
-convergenceIterations <- 5
-share_land_for_dest <- 0.35 # share of land for dest
-share_land_for_resid <- 0.7 # share of land for residential
-pxl_d <- 0.2 # pixel diameter
-nbhd_d <- 1.6 # neighbourhood diameter
-consider_categories <- F 
-densities <- seq(from = 15, to = 45, by = 10) # dwelling per hectare
-# Setting up folders ------------------------------------------------------
-output_dir <- "../outputs/Exp3_Nov30_1220/" # CHANGE THIS FOR DIFFERENT RUNS
-ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
 
-output_deci_dir <- paste0(output_dir,"decisions") # CHANGE THIS FOR DIFFERENT RUNS
-ifelse(!dir.exists(output_deci_dir), dir.create(output_deci_dir), FALSE)
+echo<- function(msg) {
+  cat(paste0(as.character(Sys.time()), ' | ', msg,"\n"))  
+}
 
-total_scores_file <- paste(output_dir, "score_summary.csv", sep = "")
-total_score_df <- data.frame(density = densities)
-
-# iterating over densities ------------------------------------------------
-dph <- densities[1] # dwelling per hectare
-for (dph in densities){ # iterating over densities
-  
-  print(paste0("******************* DWELLING DENSITY: ", dph))
+#dph <- 15
+optimise_nbhds <- function(dph) {
+  echo(paste0("******************* DWELLING DENSITY: ", dph))
   output_sub_dir <-  paste0(output_dir, "Density_", dph, "/") # one sub-dir for each density
+  print(output_sub_dir)
   ifelse(!dir.exists(output_sub_dir), dir.create(output_sub_dir), FALSE) # create if not exists
   log_file <- paste0(output_sub_dir, "output_log_D", dph, ".txt")  # log file for keeping the record
+  sink(log_file, append=FALSE, split=TRUE) # sink to both console and log file
   output_file <- paste0(output_sub_dir, "output_decision_D", dph, ".csv") # decision file indicating where final destination will be located
-  cat("", file = log_file, append = FALSE)
-  
-  cat(paste0("Total Population, ", pop),  file = log_file, append = , sep="\n")
-  cat(paste0("Dweling Density, ", dph),  file = log_file, append = TRUE, sep="\n")
-  cat(paste0("***********,", "***********"),  file = log_file, append = TRUE, sep="\n")
+
+  echo(paste0("Total Population, ", pop))
+  echo(paste0("Dweling Density, ", dph))
+  echo(paste0("***********,", "***********"))
   
   #  Destinations -----------------------------------------------------------
-  init_dest <- read.csv("../inputs/destinations_v5.csv") %>%  # list of destinations - from VPA
-    mutate(dist_in_20_min=dist_in_20_min/coverage)
+  init_dest <- read.csv("../inputs/destinations_v5.csv") #%>%  # list of destinations - from VPA
+  #mutate(dist_in_20_min=dist_in_20_min/coverage)
   # How many of each destination needed
   init_dest <- init_dest %>% 
     mutate(num_dests=ceiling(pop/init_dest$pop_req))
@@ -71,7 +54,11 @@ for (dph in densities){ # iterating over densities
   # nbhds are considered as squares 
   nbhd_dev_area <- nbhd_d^2 * share_land_for_resid # land for development per nbhd
   nbhd_n <- ceiling(pop * 0.01 / (dph * pphh * nbhd_dev_area)) # number of nbhds
+  echo(paste0("***********,", "***********"))
+  
   nbhd_sq <- make_nbhds(nbhd_d, nbhd_n) # nbhds with geometries
+  echo(paste0("***********,", "***********"))
+  
   study_area_d <- nbhd_d * (ceiling(sqrt(nbhd_n))+1) # Dimensions of the study area
   nbhd_sq <- nbhd_sq %>% # Adding Land for destinations as a var to nbhds
     mutate(land_for_dest = nbhd_d^2 * share_land_for_dest) %>% 
@@ -145,6 +132,7 @@ for (dph in densities){ # iterating over densities
   
   # Creating the locations -------------------------------------------------
   init_loc <- make_locations(nbhd_sq, study_area_d)
+  echo(paste0("***********,","make_locations", "***********"))
   
   # Sorting init dest based on pop_req*land_req
   # meaning starting from those big and high pop destinations
@@ -165,12 +153,11 @@ for (dph in densities){ # iterating over densities
   
   # Evolutionary optimisation -----------------------------------------------
   score <- 200 # Assuming the worst score when no one is served (100%) + no capacity used (100% free capacity)
-  
   decision <- init_loc 
   iter <- 1
   convergenceCounter <- 0
   while(iter < iters_max + 1){
-    print(paste("############## iteration number",iter, sep = ":"))
+    echo(paste("############## iteration number",iter, sep = ":"))
     
     # A set of temp DFs for iterations
     iter_nbhds <- nbhd_sq # assigning iter specific variable nbhds
@@ -188,8 +175,10 @@ for (dph in densities){ # iterating over densities
       unavail_decisions <- 0 # TODO check what is this
       iter_dest_code <- iter_dest$dest_code[iter_dest_row] # getting the dest type
       iter_dest_position <- iter_dest$position[iter_dest_row] # getting the dest type
-      print(paste("destination:",iter_dest_code,"; iteration:",iter,
-                  "; dwelling denisty:",dph,sep = " "))
+      
+      echo(paste("destination:",iter_dest_code,"; iteration:",iter, 
+                     "; dwelling denisty:",dph,sep = " "))
+
       
       # FIRST destination OF TYPE iter_dest_row is also going through the evolutionary process
       # Repeating the process until all neighborhoods are served
@@ -200,12 +189,14 @@ for (dph in densities){ # iterating over densities
         feasible_locs <- find_feasible_locs(iter_loc, iter_pixls,
                                             iter_dest, iter_dest_row,
                                             iter_dest_position, 
-                                            consider_categories)
+                                            consider_categories,
+                                            iter_dest_code)
         feasible_locs <- feasible_locs %>%
           filter(!(loc_id %in% unavail_decisions)) ## REMEBMER TO CHANGE THIS
         
         if(nrow(feasible_locs)==0){ # ???
-          print("No Answer")
+          echo("No Answer")
+          
           No_Answer_flag <- TRUE
           #unavail_decisions <- c(unavail_decisions, new_dest_id)
           break();
@@ -220,10 +211,9 @@ for (dph in densities){ # iterating over densities
         
         # mutation ------------------------------------------------------------
         some_rnd <- runif(n =1,0,1)
-        if(some_rnd < mutation_p) new_dest_loc_id <- sample(feasible_locs$loc_id, 1)
-        
-        print(paste0("new_dest_id: ", new_dest_loc_id))
-        
+        if(some_rnd < mutation_p & length(feasible_locs$loc_id)>1) new_dest_loc_id <- sample(feasible_locs$loc_id, 1)
+        echo(paste0("new_dest_id: ", new_dest_loc_id))
+
         # Opening a new destination -------------------------------------------
         
         # Finding neighborhoods adjacent to the location for land
@@ -237,14 +227,15 @@ for (dph in densities){ # iterating over densities
           error_counter <- error_counter + 1
           unavail_decisions <- c(unavail_decisions, new_dest_loc_id)
           if(error_counter > 100){
-            print("not enough space, SERIOUSLY! V2")
+            echo("not enough space, SERIOUSLY! V2")
+            
             land_flag <- TRUE
             stop();
           }
         }else{
           # Adding the destination to decision and location DFs
           iter_loc <- add_destination_to_location(iter_loc, new_dest_loc_id, 
-                                                  iter_dest_code)
+                                                  iter_dest_code, iter_dest)
           # Occupying the land
           iter_nbhds <- occupy_land(loc_nbhds, iter_nbhds, land_to_occupy)
           # Updating number of remaining destinations
@@ -264,6 +255,11 @@ for (dph in densities){ # iterating over densities
                                                 st_as_sf(coords=c("x","y")))) %>% 
             arrange(dist_to_dest)
           
+          
+          #iter_loc[new_dest_loc_id,] %>%  st_as_sf(coords=c("x","y")) %>% 
+          #  st_write("iter_loc_test.sqlite")
+          
+          #st_write(iter_pixls[close_pxls_id,] ,"close_pxls_sq_Test.sqlite")
           # Find all those in range and not fully served
           if(!nrow(close_pxls) > 0) message("**Something is not right**")
           
@@ -299,10 +295,10 @@ for (dph in densities){ # iterating over densities
     
     # Scoring and best solution selection -------------------------------------
     if(land_flag){
-      print("I AM HERE")
+      echo("I AM HERE")
       iter_score <- nrow(init_dest) * (200)
     }else if(No_Answer_flag){
-      print("I AM HERE 2")
+      echo("I AM HERE 2")
       iter_score <- nrow(init_dest) * (200)
     }
     else{
@@ -322,9 +318,9 @@ for (dph in densities){ # iterating over densities
       if(is.na(iter_score)) iter_score=200
     }
       
-    cat(paste("Iteration,",iter, sep = ","),file=log_file,append=TRUE, sep="\n")
-    cat(paste("Iteration_Score,",iter_score, sep = ","),file=log_file,append=TRUE, sep="\n")
-    cat(paste("Iteration_result,",iter_score, sep = ","),file=log_file,append=TRUE, sep="\n")
+    echo(paste("Iteration,",iter, sep = ","))
+    echo(paste("Iteration_Score,",iter_score, sep = ","))
+    echo(paste("Iteration_result,",iter_score, sep = ","))
     
     # Checking if it is a new best result
     if(iter_score < score){
@@ -334,28 +330,32 @@ for (dph in densities){ # iterating over densities
         st_as_sf(coords=c("x","y"))
       neighbourhood_output <- iter_nbhds 
       pixels_output <- iter_pixls
-      cat(paste("Iteration_result,","NEW_BEST_SCORE", sep = ","),file=log_file,append=TRUE, sep="\n")
-      #cat(paste("new_Best_Score,",score, sep = ","),file=log_file,append=TRUE, sep="\n")
-      print(paste0("new_Best_Score, ",score))
+      echo(paste("Iteration_result,","NEW_BEST_SCORE", sep = ","))
+      echo(paste("new_Best_Score,",score, sep = ","))
+      #echo(paste0("new_Best_Score, ",score))
     }else if(land_flag){
-      cat(paste("Iteration_result,","NO_SPACE", sep = ","),file=log_file,append=TRUE, sep="\n")
+      echo(paste("Iteration_result,","NO_SPACE", sep = ","))
     }else if(No_Answer_flag){
-      cat(paste("Iteration_result,","NO_SPACE", sep = ","),file=log_file,append=TRUE, sep="\n")
+      echo(paste("Iteration_result,","NO_SPACE", sep = ","))
     }else{
-      print("iteration score not changed")
+      echo("iteration score not changed")
+      
       convergenceCounter <- convergenceCounter + 1
-      print(paste0("convergence counter: ", convergenceCounter))
-      cat(paste("Iteration_result,","NORMAL", sep = ","),file=log_file,append=TRUE, sep="\n")
+      
+      echo(paste0("convergence counter: ", convergenceCounter),
+          )
+      echo(paste("Iteration_result,","NORMAL", sep = ","))
     }
-    cat("******, ******",file=log_file,append=TRUE, sep="\n")
+    echo("******, ******")
     if(convergenceCounter>convergenceIterations){
-      print(paste0("Skipping the rest, model seems to be converged at iter ", iter))
+      echo(paste0("Skipping the rest, model seems to be converged at iter ", iter))
+      
       break
     } 
     iter <- iter + 1
   }
   # writing outputs 
-  cat(paste("Final_best_score", score, sep = ","),file=log_file,append=TRUE, sep="\n")
+  echo(paste("Final_best_score", score, sep = ","))
   total_score_df$score[which(total_score_df$density == dph)] <- score
 
   # decision writing
@@ -370,4 +370,50 @@ for (dph in densities){ # iterating over densities
   neighbourhood_output %>% 
     mutate(density = dph) %>% 
     st_write(paste0(output_deci_dir,"/D",dph,".sqlite"),layer="nbhd",delete_layer=T)
-}
+  
+  sink()
+  
+  }
+
+
+
+# Setting initial parameters ----------------------------------------------
+pphh <- 2.6 # person per household
+pop <- 60000 # total population
+mutation_p <- 0.20 # mutate rate for optimization
+iters_max <- 50 # max number of iterations
+convergenceIterations <- 5
+share_land_for_dest <- 0.35 # share of land for dest
+share_land_for_resid <- 0.7 # share of land for residential
+pxl_d <- 0.2 # pixel diameter
+nbhd_d <- 1.6 # neighbourhood diameter
+consider_categories <- F 
+popDiversity <- T
+densities <- seq(from = 15, to = 45, by = 10) # dwelling per hectare
+# Setting up folders ------------------------------------------------------
+output_dir <- "../outputs/Exp3_withDiversity_Feb1/" # CHANGE THIS FOR DIFFERENT RUNS
+ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
+
+output_deci_dir <- paste0(output_dir,"decisions") # CHANGE THIS FOR DIFFERENT RUNS
+ifelse(!dir.exists(output_deci_dir), dir.create(output_deci_dir), FALSE)
+
+total_scores_file <- paste(output_dir, "score_summary.csv", sep = "")
+total_score_df <- data.frame(density = densities)
+
+
+
+# iterating over densities ------------------------------------------------
+#dph <- densities[1] # dwelling per hectare
+#for (dph in densities){
+#  optimise_nbhds(dph)
+#  }
+
+lapply(densities, optimise_nbhds)  
+
+#library(doParallel)  
+#no_cores <- min(( detectCores() - 1 ),  length(densities))
+#cl <- makeCluster(no_cores, type="FORK")  
+#registerDoParallel(cl)  
+#foreach(i=densities) %dopar% optimise_nbhds(i)
+#parLapply(cl, densities, optimise_nbhds)  
+#stopCluster(cl)  
