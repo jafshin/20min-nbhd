@@ -81,17 +81,57 @@ for (dph in densities){ # iterating over densities
   pxl_a <- 0.2*0.2
   pxl_dev_a <- pxl_a * share_land_for_resid # area in each pixel for population (this is used for applying density)
   pxl_n <- ceiling(pop * 0.01 / (dph * pphh * pxl_dev_a))
+  echo(paste0("***********,","pxl", "***********"))
+  
   init_pixls <- make_pixels_df(pxl_d, share_land_for_dest, pop, dph, 
                                pphh, study_area_d, nbhd_sq) # creating pixles
-  avg_px_pop <- ceiling (pop / pxl_n) # Assuming homogeneous population distribution
-  remaining_population <- pop 
-  for (nb in nbhd_sq$NBHD_ID) { # populating the pixles
-    my_pixls <- which(init_pixls$NBHD_ID == nb)
-    for (px in my_pixls){
-      init_pixls[px, "pop"] <- min(avg_px_pop, remaining_population)
-      remaining_population <- remaining_population - init_pixls$pop[px]
+  
+  if(popDiversity){
+    # high or medium density within walkable catchment of ltc
+    hdc_pct <- 0.5 # 50% more density in high density pixels
+    avg_nbhd_pop <- ceiling(pop/nbhd_n)
+    remaining_population <- pop 
+    for (nb in nbhd_sq$NBHD_ID) {
+      nbhd_pop <- min(avg_nbhd_pop, remaining_population)
+      remaining_population <- remaining_population - nbhd_pop
+      # Now we want to spread this nbhd_pop
+      my_pixls <- init_pixls %>% 
+        filter(NBHD_ID == nb) %>% 
+        mutate(dist2ltc = st_distance(st_centroid(.),st_centroid(nbhd_sq[nb,]))) %>% 
+        mutate(position=ifelse(dist2ltc<0.4, "close","away"))
+      
+      pxl_positions <- my_pixls$position %>% table()  
+      pxl_pop_ldc <- nbhd_pop / (pxl_positions["close"]*(1+hdc_pct)+pxl_positions["away"])
+      pxl_pop_hdc <- pxl_pop_ldc*(1+hdc_pct)
+      nbhd_rem_pop <- nbhd_pop
+      
+      for (i in 1:nrow(my_pixls)){
+        px <- my_pixls$ID[i]
+        if(my_pixls$position[i]=="close"){
+          #print("close")
+          init_pixls[px, "pop"] <- min(pxl_pop_hdc, nbhd_rem_pop)
+          nbhd_rem_pop <- nbhd_rem_pop - init_pixls$pop[px]
+        }else{
+          #print("away")
+          init_pixls[px, "pop"] <- min(pxl_pop_ldc, nbhd_rem_pop)
+          nbhd_rem_pop <- nbhd_rem_pop - init_pixls$pop[px]
+        }
+      }
+    }
+  }else{
+    avg_px_pop <- ceiling (pop / pxl_n) # Assuming homogeneous population distribution
+    remaining_population <- pop 
+    for (nb in nbhd_sq$NBHD_ID) { # populating the pixles
+      my_pixls <- which(init_pixls$NBHD_ID == nb)
+      for (px in my_pixls){
+        init_pixls[px, "pop"] <- min(avg_px_pop, remaining_population)
+        remaining_population <- remaining_population - init_pixls$pop[px]
+      }
     }
   }
+  
+  #st_write(init_pixls, "init_pixls_test.sqlite")
+  
   init_pixls <- init_pixls %>% filter(pop > 0) # Just keeping the pixels with pop
   
   # Joining nbhds and pixels ------------------------------------------------
