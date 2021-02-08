@@ -5,11 +5,11 @@ make_pixels_df <- function(pxl_d, share_land_for_dest, total_pop, dwelling_per_h
   pixls <- data.frame(matrix(nrow = length(my_seq)^2, ncol = 2))
   colnames(pixls) <- c("x", "y")
   my_row <- 1
-  for(i in seq(from = -(study_area_d/2)+pxl_d, to = (study_area_d/2)-pxl_d, by = pxl_d)){
-    for(j in seq(from = -(study_area_d/2)+pxl_d, to = (study_area_d/2)-pxl_d, by = pxl_d)){
-      pixls$x[my_row] <- i
-      pixls$y[my_row] <- j
-      my_row <- my_row + 1
+for(i in seq(from = -(study_area_d/2)+pxl_d, to = (study_area_d/2)-pxl_d, by = pxl_d)){
+  for(j in seq(from = -(study_area_d/2)+pxl_d, to = (study_area_d/2)-pxl_d, by = pxl_d)){
+    pixls$x[my_row] <- i
+    pixls$y[my_row] <- j
+    my_row <- my_row + 1
     }
   }
 
@@ -31,7 +31,7 @@ make_pixels_df <- function(pxl_d, share_land_for_dest, total_pop, dwelling_per_h
   pixls_crs <- pixls_sf %>% 
     st_coordinates() %>% 
     as.data.frame() %>% 
-    purrr::pmap(function(X,Y){
+    pmap(function(X,Y){
        outer <- c(X, Y) %>% 
          rbind(c(X+pxl_d, Y)) %>% 
          rbind(c(X+pxl_d, Y+pxl_d)) %>% 

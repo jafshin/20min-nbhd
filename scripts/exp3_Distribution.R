@@ -44,7 +44,7 @@ optimise_nbhds <- function(dph) {
   echo(paste0("***********,", "***********"))
   
   #  Destinations -----------------------------------------------------------
-  init_dest <- read.csv("../inputs/destinations_v5.csv") #%>%  # list of destinations - from VPA
+  init_dest <- read.csv("../inputs/destinations_v6.csv") #%>%  # list of destinations - from VPA
   #mutate(dist_in_20_min=dist_in_20_min/coverage)
   # How many of each destination needed
   init_dest <- init_dest %>% 
@@ -342,8 +342,7 @@ optimise_nbhds <- function(dph) {
       
       convergenceCounter <- convergenceCounter + 1
       
-      echo(paste0("convergence counter: ", convergenceCounter),
-          )
+      echo(paste0("convergence counter: ", convergenceCounter))
       echo(paste("Iteration_result,","NORMAL", sep = ","))
     }
     echo("******, ******")
@@ -375,8 +374,6 @@ optimise_nbhds <- function(dph) {
   
   }
 
-
-
 # Setting initial parameters ----------------------------------------------
 pphh <- 2.6 # person per household
 pop <- 60000 # total population
@@ -389,9 +386,9 @@ pxl_d <- 0.2 # pixel diameter
 nbhd_d <- 1.6 # neighbourhood diameter
 consider_categories <- F 
 popDiversity <- T
-densities <- seq(from = 15, to = 45, by = 10) # dwelling per hectare
+densities <- seq(from = 35, to = 45, by = 10) # dwelling per hectare
 # Setting up folders ------------------------------------------------------
-output_dir <- "../outputs/Exp3_withDiversity_Feb1/" # CHANGE THIS FOR DIFFERENT RUNS
+output_dir <- "../outputs/Exp3_withDiversity_Feb1_1734/" # CHANGE THIS FOR DIFFERENT RUNS
 ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
 
 output_deci_dir <- paste0(output_dir,"decisions") # CHANGE THIS FOR DIFFERENT RUNS

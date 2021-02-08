@@ -23,44 +23,26 @@ source("./functions/distribute_population.R")
 source("./functions/make_nbhds.R")
 source("./functions/make_locations.R")
 
-# Setting initial parameters ----------------------------------------------
-pphh <- 2.6 # person per household
-pop <- 30000 # total population
-mutation_p <- 0.20 # mutate rate for optimization
-iters_max <- 5 # number of iterations
-convergenceIterations <- 5
-share_land_for_dest <- 0.35 # share of land for dest
-share_land_for_resid <- 0.7 # share of land for residential
-pxl_d <- 0.2 # pixel diameter
-nbhd_d <- 1.6 # neighbourhood diameter
-consider_categories <- TRUE 
-densities <- seq(from = 15, to = 45, by = 10) # dwelling per hectare
-# Setting up folders ------------------------------------------------------
-output_dir <- "../outputs/Exp4_Nov30_1500/" # CHANGE THIS FOR DIFFERENT RUNS
-ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
-
-output_deci_dir <- paste0(output_dir,"decisions") # CHANGE THIS FOR DIFFERENT RUNS
-ifelse(!dir.exists(output_deci_dir), dir.create(output_deci_dir), FALSE)
-
-total_scores_file <- paste(output_dir, "score_summary.csv", sep = "")
-total_score_df <- data.frame(density = densities)
+echo<- function(msg) {
+  cat(paste0(as.character(Sys.time()), ' | ', msg,"\n"))  
+}
 
 # iterating over densities ------------------------------------------------
-dph <- densities[1] # dwelling per hectar
-for (dph in densities){ # iterating over densities
-  
+#dph <- densities[1] # dwelling per hectar
+#for (dph in densities){ # iterating over densities
+optimise_nbhds <- function(dph) {
   print(paste0("******************* DWELLING DENSITY: ", dph))
   output_sub_dir <-  paste0(output_dir, "Density_", dph, "/") # one sub-dir for each density
   ifelse(!dir.exists(output_sub_dir), dir.create(output_sub_dir), FALSE) # create if not exists
   log_file <- paste0(output_sub_dir, "output_log_D", dph, ".txt")  # log file for keeping the record
+  sink(log_file, append=FALSE, split=TRUE) # sink to both console and log file
   output_file <- paste0(output_sub_dir, "output_decision_D", dph, ".csv") # decision file indicating where final destination will be located
-  cat("", file = log_file, append = FALSE)
   
   cat(paste("Total Population", pop, sep = ","),  file = log_file, append = , sep="\n")
   cat(paste("Dweling Density", dph, sep = ","),  file = log_file, append = TRUE, sep="\n")
   cat(paste("***********", "***********", sep = ","),  file = log_file, append = TRUE, sep="\n")
   
-  init_dest <- read.csv("../inputs/destinations_v5.csv") # list of destinations - from VPA
+  init_dest <- read.csv("../inputs/destinations_v6.csv") # list of destinations - from VPA
 
   # Creating the neighbourhoods ---------------------------------------------
   # nbhds are considered as squares 
@@ -78,14 +60,48 @@ for (dph in densities){ # iterating over densities
   pxl_n <- ceiling(pop * 0.01 / (dph * pphh * pxl_dev_a))
   init_pixls <- make_pixels_df(pxl_d, share_land_for_dest, pop, dph, 
                                pphh, study_area_d, nbhd_sq) # creating pixles
-  #init_pixls <- distribute_population(avg_px_pop, nbhd_sq, init_pixls, pop, init_dest)
-  avg_px_pop <- ceiling (pop / pxl_n) # Assuming homogeneous population distribution
-  remaining_population <- pop 
-  for (nb in nbhd_sq$NBHD_ID) { # populating the pixles
-    my_pixls <- which(init_pixls$NBHD_ID == nb)
-    for (px in my_pixls){
-      init_pixls[px, "pop"] <- min(avg_px_pop, remaining_population)
-      remaining_population <- remaining_population - init_pixls$pop[px]
+  
+  if(popDiversity){
+    # high or medium density within walkable catchment of ltc
+    hdc_pct <- 0.5 # 50% more density in high density pixels
+    avg_nbhd_pop <- ceiling(pop/nbhd_n)
+    remaining_population <- pop 
+    for (nb in nbhd_sq$NBHD_ID) {
+      nbhd_pop <- min(avg_nbhd_pop, remaining_population)
+      remaining_population <- remaining_population - nbhd_pop
+      # Now we want to spread this nbhd_pop
+      my_pixls <- init_pixls %>% 
+        filter(NBHD_ID == nb) %>% 
+        mutate(dist2ltc = st_distance(st_centroid(.),st_centroid(nbhd_sq[nb,]))) %>% 
+        mutate(position=ifelse(dist2ltc<0.4, "close","away"))
+      
+      pxl_positions <- my_pixls$position %>% table()  
+      pxl_pop_ldc <- nbhd_pop / (pxl_positions["close"]*(1+hdc_pct)+pxl_positions["away"])
+      pxl_pop_hdc <- pxl_pop_ldc*(1+hdc_pct)
+      nbhd_rem_pop <- nbhd_pop
+      
+      for (i in 1:nrow(my_pixls)){
+        px <- my_pixls$ID[i]
+        if(my_pixls$position[i]=="close"){
+          #print("close")
+          init_pixls[px, "pop"] <- min(pxl_pop_hdc, nbhd_rem_pop)
+          nbhd_rem_pop <- nbhd_rem_pop - init_pixls$pop[px]
+        }else{
+          #print("away")
+          init_pixls[px, "pop"] <- min(pxl_pop_ldc, nbhd_rem_pop)
+          nbhd_rem_pop <- nbhd_rem_pop - init_pixls$pop[px]
+        }
+      }
+    }
+  }else{
+    avg_px_pop <- ceiling (pop / pxl_n) # Assuming homogeneous population distribution
+    remaining_population <- pop 
+    for (nb in nbhd_sq$NBHD_ID) { # populating the pixles
+      my_pixls <- which(init_pixls$NBHD_ID == nb)
+      for (px in my_pixls){
+        init_pixls[px, "pop"] <- min(avg_px_pop, remaining_population)
+        remaining_population <- remaining_population - init_pixls$pop[px]
+      }
     }
   }
   init_pixls <- init_pixls %>% filter(pop > 0) # Just keeping the pixels with pop
@@ -155,7 +171,8 @@ for (dph in densities){ # iterating over densities
         feasible_locs <- find_feasible_locs(iter_loc, iter_pixls,
                                             iter_dest, iter_dest_row,
                                             iter_dest_position, 
-                                            consider_categories)
+                                            consider_categories,
+                                            iter_dest_code)
         
         feasible_locs <- feasible_locs %>%
           filter(!(loc_id %in% unavail_decisions))
@@ -176,7 +193,7 @@ for (dph in densities){ # iterating over densities
        
         # mutation ------------------------------------------------------------
         some_rnd <- runif(n =1,0,1)
-        if(some_rnd < mutation_p) new_dest_loc_id <- sample(feasible_locs$loc_id, 1)
+        if(some_rnd < mutation_p & length(feasible_locs$loc_id)>1) new_dest_loc_id <- sample(feasible_locs$loc_id, 1)
         
         print(paste("new_dest_id:", new_dest_loc_id))
         
@@ -200,7 +217,7 @@ for (dph in densities){ # iterating over densities
         }else{
           # Adding the destination to decision and location DFs
           iter_loc <- add_destination_to_location(iter_loc, new_dest_loc_id, 
-                                                  iter_dest_code)
+                                                  iter_dest_code, iter_dest)
           # Occupying the land
           iter_nbhds <- occupy_land(loc_nbhds, iter_nbhds, land_to_occupy)
           
@@ -262,6 +279,7 @@ for (dph in densities){ # iterating over densities
       for(dest in iter_dest$dest_code){
         pt <- sum(iter_loc[,paste0("pop_total_",dest)])
         ptr <- sum(iter_loc[,paste0("pop_remaining_",dest)])
+        ptr <- ifelse(ptr==0,1,ptr)
         no <- sum(iter_loc[,paste0("num_dest_",dest)])
         dw <- iter_dest[which(iter_dest$dest_code==dest),"dest_weight"]
       
@@ -304,7 +322,7 @@ for (dph in densities){ # iterating over densities
   # Writing some of the inputs
   # writing outputs 
   cat(paste("Final_best_score", score, sep = ","),file=log_file,append=TRUE, sep="\n")
-  total_score_df$score[which(total_score_df$density == dph)] <- score
+  #total_score_df$score[which(total_score_df$density == dph)] <- score
   
   # decision writing
   decision %>% 
@@ -320,3 +338,30 @@ for (dph in densities){ # iterating over densities
     mutate(density = dph) %>% 
     st_write(paste0(output_deci_dir,"/D",dph,".sqlite"),layer="nbhd",delete_layer=T)
 }
+
+# Setting initial parameters ----------------------------------------------
+pphh <- 2.6 # person per household
+pop <- 60000 # total population
+mutation_p <- 0.20 # mutate rate for optimization
+iters_max <- 100 # number of iterations
+convergenceIterations <- 10
+share_land_for_dest <- 0.35 # share of land for dest
+share_land_for_resid <- 0.7 # share of land for residential
+pxl_d <- 0.2 # pixel diameter
+nbhd_d <- 1.6 # neighbourhood diameter
+consider_categories <- TRUE 
+popDiversity <- T
+densities <- seq(from = 15, to = 45, by = 10) # dwelling per hectare
+
+# Setting up folders ------------------------------------------------------
+output_dir <- "~/Dropbox/20minbhd/outputs/Exp4_withDiversity_Feb9_0914/" # CHANGE THIS FOR DIFFERENT RUNS
+ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
+
+output_deci_dir <- paste0(output_dir,"decisions") # CHANGE THIS FOR DIFFERENT RUNS
+ifelse(!dir.exists(output_deci_dir), dir.create(output_deci_dir), FALSE)
+
+#total_scores_file <- paste(output_dir, "score_summary.csv", sep = "")
+#total_score_df <- data.frame(density = densities) %>% 
+
+lapply(densities, optimise_nbhds)  
+

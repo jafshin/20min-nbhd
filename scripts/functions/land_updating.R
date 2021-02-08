@@ -9,13 +9,14 @@ get_unsrvd_pop <- function(iter_pixls, iter_dest_code){
 } 
 
 # Function to add destinations to locations -------------------------------
-add_destination_to_location <- function(iter_loc, new_dest_loc_id, iter_dest_code){
+add_destination_to_location <- function(iter_loc, new_dest_loc_id, iter_dest_code,
+                                        iter_dest){
   
   loc_row <- which(iter_loc$loc_id == as.integer(new_dest_loc_id))
   loc_col <- paste0("num_dest_", iter_dest_code)
   
   iter_loc[loc_row,loc_col] <- iter_loc[loc_row,loc_col] + 1
-  new_capacity <- iter_dest$pop_req[which(iter_dest$dest_code == iter_dest_code)]
+  new_capacity <- iter_dest$pop_req[which(iter_dest$dest_code == iter_dest_code)] *1.5
   pop_total_col <- paste0("pop_total_",iter_dest_code)
   iter_loc[loc_row,pop_total_col] <- iter_loc[loc_row,pop_total_col] + new_capacity
   pop_remainder_col <- paste0("pop_remaining_",iter_dest_code)
@@ -62,7 +63,7 @@ occupy_land <- function(this_loc_nbhds, iter_nbhds, land_to_occupy,
   if(land_to_occupy >0){
     #print("donation process")
     while(land_to_occupy >0){
-      this_nbhd <- sample(loc_nbhds, size = 1)
+      this_nbhd <- sample(this_loc_nbhds, size = 1)
       nbhd_row <- which(iter_nbhds$NBHD_ID == this_nbhd)
       land_to_occupy_per_this <- min(land_to_occupy, iter_nbhds$remaining_land_for_dest[nbhd_row] )
       iter_nbhds$remaining_land_for_dest[nbhd_row] <- iter_nbhds$remaining_land_for_dest[nbhd_row] - land_to_occupy_per_this
@@ -74,7 +75,7 @@ occupy_land <- function(this_loc_nbhds, iter_nbhds, land_to_occupy,
 
 # Feasible Location Finder ------------------------------------------------
 find_feasible_locs <- function(iter_loc, iter_pixls, iter_dest, 
-                               iter_dest_row,iter_dest_position,consider_categories){
+                               iter_dest_row,iter_dest_position,consider_categories, iter_dest_code){
   # a function to find feasible decision locations, we need this to limit the search space
   # The idea here is to for each location, to find a potential catchment
   # so it will limit the search space for the program
@@ -84,7 +85,10 @@ find_feasible_locs <- function(iter_loc, iter_pixls, iter_dest,
     if(iter_dest_position%in%c("ltc","nltc","etc")){
       feasible_locs <- iter_loc %>% # getting all the decision points for this dest
         filter(position==iter_dest_position) 
-    }else{
+    }else if(iter_dest_position=="all"){
+      feasible_locs <- iter_loc
+    }
+    else{
       dest_col_name <- paste0("num_dest_",iter_dest_position)
       feasible_locs <- iter_loc[which(iter_loc[,dest_col_name]>0),]
     }
