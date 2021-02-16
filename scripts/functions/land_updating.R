@@ -123,3 +123,59 @@ find_feasible_locs <- function(iter_loc, iter_pixls, iter_dest,
   # order by catchment
   return(feasible_locs)
 }
+
+
+# Feasible Location Finder ------------------------------------------------
+find_feasible_locs2 <- function(iter_pixls, iter_dest, iter_dest_row,
+                                iter_dest_position,consider_categories, 
+                                iter_dest_code){
+  # a function to find feasible decision locations, we need this to limit the search space
+  # The idea here is to for each location, to find a potential catchment
+  # so it will limit the search space for the program
+  # potential catchment is considered as the 20 min access
+  
+  if(consider_categories){
+    if(iter_dest_position%in%c("ltc","nltc","etc")){
+      feasible_locs <- iter_pixls %>% # getting all the decision points for this dest
+        filter(position==iter_dest_position) 
+    }else if(iter_dest_position=="all"){
+      feasible_locs <- iter_pixls
+    }
+    else{
+      dest_col_name <- paste0("num_dest_",iter_dest_position)
+      feasible_locs <- iter_pixls[which(iter_pixls[,dest_col_name]>0),]
+    }
+  }else{
+    feasible_locs <- iter_pixls 
+  }
+  feasible_locs <- feasible_locs %>% 
+    mutate(catchment_potential=0)
+  # potential catchment (based on having less than 20 minutes access)
+  #i=1
+  for (i in 1:nrow(feasible_locs)){
+    feasible_pxls <- feasible_locs[i,] %>% 
+      st_as_sf(coords=c("pxl_x","pxl_y")) %>% 
+      st_buffer(as.numeric(iter_dest[iter_dest_row,"dist_in_20_min"])) %>% 
+      st_intersects(st_centroid(iter_pixls %>% st_as_sf(coords=c("pxl_x","pxl_y")))
+                    ,sparse = F) 
+    ## TO HERE
+    
+    if(length(feasible_pxls)>0){
+      catchment_potential <- iter_pixls[feasible_pxls,] %>% 
+        select(notServedPop=paste0("not_served_by_", iter_dest_code)) %>%  
+        summarise(total=sum(notServedPop)) %>% 
+        as.numeric()
+    }else catchment_potential <- 0
+    
+    feasible_locs$catchment_potential[i] <- min(iter_dest$pop_req[iter_dest_row], 
+                                                catchment_potential) 
+  }
+  
+  # Finding the potential catchment for each location
+  # Remove those with catchment = 0
+  feasible_locs <- feasible_locs %>% 
+    filter(catchment_potential>0) %>% 
+    arrange(desc(catchment_potential))
+  # order by catchment
+  return(feasible_locs)
+}
