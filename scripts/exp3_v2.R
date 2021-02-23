@@ -29,7 +29,7 @@ echo<- function(msg) {
   cat(paste0(as.character(Sys.time()), ' | ', msg,"\n"))  
 }
 
-#dph <- 15
+# dph <- 15
 optimise_nbhds <- function(dph) {
   echo(paste0("******************* DWELLING DENSITY: ", dph))
   output_sub_dir <-  paste0(output_dir, "Density_", dph, "/") # one sub-dir for each density
@@ -54,10 +54,8 @@ optimise_nbhds <- function(dph) {
   # nbhds are considered as squares 
   nbhd_dev_area <- nbhd_d^2 * share_land_for_resid # land for development per nbhd
   nbhd_n <- ceiling(pop * 0.01 / (dph * pphh * nbhd_dev_area)) # number of nbhds
-  echo(paste0("***********,", "***********"))
   
   nbhds <- make_nbhds(nbhd_d, nbhd_n) # nbhds with geometries
-  echo(paste0("***********,", "***********"))
   
   study_area_d <- nbhd_d * (ceiling(sqrt(nbhd_n))+1) # Dimensions of the study area
   nbhds <- nbhds %>% # Adding Land for destinations as a var to nbhds
@@ -68,33 +66,37 @@ optimise_nbhds <- function(dph) {
   pxl_a <- pxl_d*pxl_d
   pxl_dev_a <- pxl_a * share_land_for_resid # area in each pixel for population (this is used for applying density)
   pxl_n <- ceiling(pop * 0.01 / (dph * pphh * pxl_dev_a))
-  echo(paste0("***********,","pxl", "***********"))
 
   pixls <- make_pixels_df(pxl_d, share_land_for_dest, pop, dph, 
                                pphh, study_area_d, nbhds) # creating pixles
-
+  
+  # Replace nbhd coordinates with its centroid X and Y
   nbhds_geom <- nbhds[,"NBHD_ID"]
   nbhds <- nbhds %>%
     mutate(nbhd_x=as.numeric(sf::st_coordinates(st_centroid(.))[,1]),
            nbhd_y=as.numeric(sf::st_coordinates(st_centroid(.))[,2]))%>% 
     st_drop_geometry()  
   
+  # Replace cell coordinates with its centroid X and Y
   pixls_geom <- pixls[,"ID"]
   pixls <- pixls %>% 
     mutate(pxl_x=as.numeric(sf::st_coordinates(st_centroid(.))[,1]),
            pxl_y=as.numeric(sf::st_coordinates(st_centroid(.))[,2]))%>% 
     st_drop_geometry()
   
-  
+  # Add distance to nbhd centre to cells
   pixls <- pixls %>% 
     left_join(nbhds[,c("NBHD_ID","nbhd_x","nbhd_y")], by = c("NBHD_ID")) %>% 
-    mutate(dist2ltc = sqrt((pxl_x-nbhd_x)^2 + (pxl_y-nbhd_y)^2 ))
+    mutate(dist2ltc = sqrt((pxl_x-nbhd_x)^2 + (pxl_y-nbhd_y)^2 )) %>% 
+    mutate(nbhdQ=paste0(NBHD_ID,"_1")) %>% 
+    mutate(nbhdQ=ifelse(test = pxl_x>nbhd_x & pxl_y<nbhd_y , yes = paste0(NBHD_ID,"_2"), no=nbhdQ)) %>% 
+    mutate(nbhdQ=ifelse(test = pxl_x<nbhd_x & pxl_y<nbhd_y , yes = paste0(NBHD_ID,"_3"), no=nbhdQ)) %>% 
+    mutate(nbhdQ=ifelse(test = pxl_x<nbhd_x & pxl_y>nbhd_y , yes = paste0(NBHD_ID,"_4"), no=nbhdQ))  
   
-
+  # Write cells to spatialite file
   pixls %>% 
     left_join(pixls_geom, by = "ID") %>%
     st_write("init_pixls225.sqlite", delete_layer = T)
-  
   
   if(popDiversity){
     # high or medium density within walkable catchment of ltc
@@ -107,7 +109,8 @@ optimise_nbhds <- function(dph) {
       # Now we want to spread this nbhd_pop
       my_pixls <- pixls %>% 
         filter(NBHD_ID == nb) %>% 
-        mutate(position=ifelse(dist2ltc<0.4, "close","away"))
+        mutate(position=ifelse(dist2ltc<0.4, "close","away")) %>% 
+        
       
       pxl_positions <- my_pixls$position %>% table()  
       pxl_pop_ldc <- nbhd_pop / (pxl_positions["close"]*(1+hdc_pct)+pxl_positions["away"])
@@ -139,7 +142,6 @@ optimise_nbhds <- function(dph) {
       }
     }
   }
-  #st_write(init_pixls, "init_pixls_test.sqlite")
   
   ## 
   pixls <- pixls %>% filter(pop > 0) %>% # Just keeping the pixels with pop
@@ -159,15 +161,13 @@ optimise_nbhds <- function(dph) {
   nbhds <- pixls %>%
     group_by(NBHD_ID) %>%
     summarise(pop = sum(pop)) %>%
-    left_join(nbhds, by="NBHD_ID") %>% 
-    st_as_sf()
+    left_join(nbhds, by="NBHD_ID")  %>% 
+    filter(pop>0)
   #plot(nbhds)
   
   # Creating the locations -------------------------------------------------
-  ## EACH PXL WILL BE A DECISION POINT
-  init_loc <- make_locations(nbhds, study_area_d)
-  ##
-  echo(paste0("***********,","make_locations", "***********"))
+  ## EACH PXL WILL BE A DECISION POINT SO COMMENTING THIS OUT
+  # init_loc <- make_locations(nbhds, study_area_d)
   
   # Sorting init dest based on pop_req*land_req
   # meaning starting from those big and high pop destinations
@@ -189,7 +189,9 @@ optimise_nbhds <- function(dph) {
   #  st_drop_geometry()
   iter_dest <- init_dest # assigning iter specific variable destinations
   iter_pixls <- pixls # assigning iter specific variable pixels
-  
+
+# Initial dest distribution -----------------------------------------------
+
   land_flag <- FALSE # a flag for whether there are land avail or not
   No_Answer_flag <- FALSE # a flag for when no answer will be found
   
@@ -200,8 +202,7 @@ optimise_nbhds <- function(dph) {
     iter_dest_code <- iter_dest$dest_code[iter_dest_row] # getting the dest type
     iter_dest_position <- iter_dest$position[iter_dest_row] # getting the dest type
     
-    echo(paste("destination:",iter_dest_code,"; iteration:",iter, 
-               "; dwelling denisty:",dph,sep = " "))
+    echo(paste("destination:",iter_dest_code,"; dwelling denisty:",dph,sep=" "))
     
     
     # FIRST destination OF TYPE iter_dest_row is also going through the evolutionary process
@@ -210,15 +211,13 @@ optimise_nbhds <- function(dph) {
     remaining_num_dests <- iter_dest$num_dests[iter_dest_row]
     while((get_unsrvd_pop(iter_pixls, iter_dest_code) > pop*(1-iter_dest$coverage[iter_dest_row])) & (remaining_num_dests > 0)){ # loop until all are served AND we have destinations to use
       # CREATING A LIST OF DIFFERENT LOCATIONS AND THEIR POTENTIAL CATCHMENTS
-      feasible_locs <- find_feasible_locs2(iter_pixls,
-                                          iter_dest, iter_dest_row,
-                                          iter_dest_position, 
-                                          consider_categories,
-                                          iter_dest_code)
-      feasible_locs <- feasible_locs %>%
-        filter(!(loc_id %in% unavail_decisions)) ## REMEBMER TO CHANGE THIS
+
+      system.time(destCellsID <- findDestinationCells(iter_pixls,iter_dest,iter_dest_row,
+                                                    iter_nbhds,iter_dest_code,pxl_a)
+      )
+      destCells <- which(iter_pixls$ID%in%destCellsID)
       
-      if(nrow(feasible_locs)==0){ # ???
+      if(length(destCellsID)==0){ # ???
         echo("No Answer")
         
         No_Answer_flag <- TRUE
@@ -226,25 +225,107 @@ optimise_nbhds <- function(dph) {
         break();
       }
       
-      # selecting one from max catchments by random
-      new_dest_loc_id <- feasible_locs %>%
-        filter(catchment_potential == max(catchment_potential)) %>%
-        select(loc_id) %>% 
-        sample_n(size = 1) %>% 
-        as.integer()
+      # Add destination to the the cell
+      iter_pixls$type[destCells] <- iter_dest_code
+      # Adding new capacity
+      pop_remainder_col <- paste0("pop_remaining_",iter_dest_code)
+      pop_total_col <- paste0("pop_total_",iter_dest_code)
+      iter_pixls[destCells,pop_total_col] <- iter_dest[iter_dest_row,"capacity"]
+      iter_pixls[destCells,pop_remainder_col] <- iter_dest[iter_dest_row,"capacity"]
+      
+      remaining_num_dests <- remaining_num_dests - 1
+      
+      # Start serving people around
+      destGeom <- iter_pixls %>% 
+        filter(ID%in%destCells) %>% 
+        st_as_sf(coords=c("pxl_x","pxl_y"), remove=F) %>% 
+        st_union() %>% 
+        st_convex_hull() 
+      
+      # destGeom%>% 
+      #    st_write("selectedPxls_CH.sqlite", delete_layer=T)
+      
+      # Getting those within 20 min access    
+      cellsWithinDistRow <- destGeom %>% 
+        st_buffer(0.8) %>% 
+        st_intersects(iter_pixls %>% st_as_sf(coords=c("pxl_x","pxl_y"), remove=F)) 
+        
+      cellsWithinDistID <- iter_pixls[unlist(cellsWithinDistRow),] %>% 
+        st_as_sf(coords=c("pxl_x","pxl_y"), remove=F) %>% 
+        dplyr::mutate(dist2Dest=st_distance(.,destGeom)) %>% 
+        st_drop_geometry() %>% 
+        arrange(dist2Dest) %>%
+        dplyr::select(ID)
+        # plot()
+        # st_sf() %>% 
+        # st_write("cellsWithin20Min222.sqlite", delete_layer=T)
   
-  
-  
-  
-  
-  
-  
-  
-  
-  
+      if(!nrow(cellsWithinDistID) > 0) message("**Something is not right**")
+      # Serving cells 
+      
+      # id = cellsWithinDistID$ID[1]
+      for (id in cellsWithinDistID$ID) {
+        # print(id)
+        cellRow <-  which(iter_pixls$ID==id)
+        cell_unsrved_pop <-  get_unsrvd_pop(iter_pixls[cellRow,],
+                                            iter_dest_code)
+
+        if (iter_pixls[destCells,pop_remainder_col][1] > 0 & cell_unsrved_pop > 0){
+          # print("here")
+          pop2cover <- min(iter_pixls[destCells,pop_remainder_col][1] , 
+                           cell_unsrved_pop) # finding population to cover
+          # Updating the capapcity
+          iter_pixls[destCells,pop_remainder_col] <- iter_pixls[destCells,pop_remainder_col][1]-pop2cover
+          # Updating unserved pop
+          iter_pixls[cellRow, paste("not_served_by_",
+                                    iter_dest_code, sep = "")] <- cell_unsrved_pop - pop2cover
+          
+        }
+      } 
+
+      
+      # Add a check here for if there are unserved pop in the close pxls
+      # for (i in 1:nrow(close_pxls)) {
+      #   temp_pixl_id <- st_drop_geometry(close_pxls[i,"ID"]) %>% 
+      #     as.numeric()
+      #   temp_pixl_row <- which(iter_pixls$ID==temp_pixl_id)
+      #   
+      #   # TODO there seems to be an issue here, check if it is getting the unsrved pop correctly
+      #   pxls_unsrved_pop <-  get_unsrvd_pop(iter_pixls[temp_pixl_row,],
+      #                                       iter_dest_code)
+      #   pop_remainder_col <- paste0("pop_remaining_",iter_dest_code)
+      #   if (iter_loc[new_dest_loc_id,pop_remainder_col] > 0 & pxls_unsrved_pop > 0){
+      #     # If distance is less than 20 min given the mode speed and nb has unserved pop
+          # pop2cover <- min(iter_loc[new_dest_loc_id,pop_remainder_col], 
+          #                  pxls_unsrved_pop) # finding population to cover
+          # 
+          # updating not served pop in deci and pixles
+          # iter_loc[new_dest_loc_id,pop_remainder_col] <- iter_loc[new_dest_loc_id,pop_remainder_col] - pop2cover
+          # iter_pixls[temp_pixl_row, paste("not_served_by_", 
+          #                                 iter_dest_code, sep = "")] <- pxls_unsrved_pop - pop2cover
+          # adding the destinations to iter deci df
+    }
+    iter_pixls %>% 
+      st_as_sf(coords=c("pxl_x","pxl_y"), remove=F) %>% 
+      st_write("iter_pixls_Feb23_1230.sqlite", layer = dph, delete_layer=T)
+    
+  }
+    
+  # TODO We keep running out of space, check what is happenning with nbhds!? 
+    # TODO Redistribute the population
+  iter_pixls %>% 
+    mutate(isResid=ifelse(type=="resid", yes=1,no=0)) %>% 
+    group_by(NBHD_ID) %>% summarise(count=n(),
+                                    residCount=sum(isResid),
+                                    Pct=100*(count-residCount)/count) 
+    
+    # 
+    
+    
+    
   # Evolutionary optimisation -----------------------------------------------
   score <- 200 # Assuming the worst score when no one is served (100%) + no capacity used (100% free capacity)
-  decision <- init_loc 
+  #decision <- init_loc 
   iter <- 1
   convergenceCounter <- 0
   while(iter < iters_max + 1){
@@ -496,7 +577,7 @@ total_score_df <- data.frame(density = densities)
 #  optimise_nbhds(dph)
 #  }
 
-lapply(densities, optimise_nbhds)  
+# lapply(densities, optimise_nbhds)  
 
 #library(doParallel)  
 #no_cores <- min(( detectCores() - 1 ),  length(densities))

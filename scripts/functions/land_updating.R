@@ -3,7 +3,6 @@
 get_unsrvd_pop <- function(iter_pixls, iter_dest_code){
   unsrvd <- iter_pixls %>% 
     dplyr::select(paste("not_served_by_", iter_dest_code, sep = "")) %>% 
-    st_drop_geometry() %>% 
     sum()
   return(unsrvd)
 } 
@@ -153,6 +152,7 @@ find_feasible_locs2 <- function(iter_pixls, iter_dest, iter_dest_row,
   # potential catchment (based on having less than 20 minutes access)
   #i=1
   for (i in 1:nrow(feasible_locs)){
+  # for (i in 1:10){
     feasible_pxls <- feasible_locs[i,] %>% 
       st_as_sf(coords=c("pxl_x","pxl_y")) %>% 
       st_buffer(as.numeric(iter_dest[iter_dest_row,"dist_in_20_min"])) %>% 
@@ -178,4 +178,57 @@ find_feasible_locs2 <- function(iter_pixls, iter_dest, iter_dest_row,
     arrange(desc(catchment_potential))
   # order by catchment
   return(feasible_locs)
+}
+
+findDestinationCells <- function(iter_pixls,iter_dest,iter_dest_row,
+                                iter_nbhds,iter_dest_code,pxl_a){
+  # a function to find feasible decision locations, we need this to limit the search space
+  # The idea here is to for each location, to find a potential catchment
+  # so it will limit the search space for the program
+  # potential catchment is considered as the 20 min access
+  
+  cellsToOccupy <- max(1,round(iter_dest$land_req[iter_dest_row]/pxl_a))
+  
+  feasible_nbhds <- iter_pixls %>% 
+    mutate(wt=ifelse(type=="resid",yes = 0,no=1)) %>% 
+    group_by(nbhdQ) %>% 
+    summarise(catchment_potential = sum(.data[[paste0("not_served_by_", iter_dest_code)]]),
+              cells=n(),
+              cellsWithDest=sum(wt)) %>% 
+    filter(cellsToOccupy+cellsWithDest<0.35*cells) %>% # Making sure there is enough space
+    filter(catchment_potential>0) %>% 
+    arrange(desc(catchment_potential))  
+  
+  # selecting one from max catchments by random
+  new_dest_nbhd <- feasible_nbhds %>%
+    filter(catchment_potential == max(catchment_potential)) %>%
+    dplyr::select(nbhdQ) %>% 
+    sample_n(size = 1) %>% 
+    as.character()
+  
+  # Select a cell from the nbhds as the centre
+  # iter_nbhds %>% 
+  #   filter(nbhdQ==new_dest_nbhd)
+  
+  centrePxl <- iter_pixls %>% 
+    filter(nbhdQ==new_dest_nbhd) %>% 
+    filter(type=="resid") %>% 
+    sample_n(1) %>% 
+    st_as_sf(coords=c("pxl_x","pxl_y"), remove=F)
+  
+  closePxls <- centrePxl %>% 
+    st_buffer(0.4) %>% 
+    st_intersection(iter_pixls %>% 
+                      filter(type=="resid") %>% 
+                      st_as_sf(coords=c("pxl_x","pxl_y"))) %>% 
+    mutate(dist2Pxl = st_distance(.,centrePxl)) %>% 
+    arrange(dist2Pxl)
+  
+  plxs4Dest <- closePxls %>%  slice_head(n=cellsToOccupy)
+  
+  # st_write(centrePxl, "centrePxl.sqlite")
+  # st_write(closePxls, "closePxls2.sqlite", delete_layer = T)
+  # st_write(plxs4Dest, "plxs4Dest.sqlite", delete_layer = T)
+  # order by catchment
+  return(plxs4Dest$ID.1)
 }

@@ -24,19 +24,19 @@ make_locations <- function(nbhd_sq,study_area_d){
   loc_ltc <- locs_sf %>%  
     st_buffer(locs_d/10) %>%
     st_intersects(st_buffer(st_centroid(nbhd_sq),0.4))
-  for(i in 1:nrow(locs_sf))  if (length(loc_ltc[[i]])>0) locs_sf[i,"position"]="nltc"
+  for(i in 1:nrow(locs_sf))  if(length(loc_ltc[[i]])>0) locs_sf[i,"position"]="nltc"
   
   # Finding at the the local town centres
   loc_ltc <- locs_sf %>%  
     st_buffer(locs_d/10) %>%
     st_intersects(st_buffer(st_centroid(nbhd_sq),locs_d/10))
-  for(i in 1:nrow(locs_sf))  if (length(loc_ltc[[i]])>0) locs_sf[i,"position"]="ltc"
+  for(i in 1:nrow(locs_sf))  if(length(loc_ltc[[i]])>0) locs_sf[i,"position"]="ltc"
   
   # finiding at the major town centres 
   loc_nbhds <- locs_sf %>%  
     st_buffer(locs_d/10) %>% 
     st_intersects(nbhd_sq)
-  for(i in 1:nrow(locs_sf)) if (length(loc_nbhds[[i]])==4) locs_sf[i,"position"]="mtc"   
+  for(i in 1:nrow(locs_sf)) if(length(loc_nbhds[[i]])==4) locs_sf[i,"position"]="mtc"   
   #plot(init_pixls$geometry, col="green", alpha=0.8)
   #plot(locs_sf$geometry, col = "blue", alpha=0.8, add =T)
   #plot(nbhd_sq$geometry, lwd = 2, add=T)
