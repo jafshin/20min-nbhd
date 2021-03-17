@@ -180,14 +180,13 @@ find_feasible_locs2 <- function(iter_pixls, iter_dest, iter_dest_row,
   return(feasible_locs)
 }
 
-findDestinationCells <- function(iter_pixls,iter_dest,iter_dest_row,
-                                iter_nbhds,iter_dest_code,pxl_a){
+findDestinationCells <- function(iter_pixls,iter_dest,cellsToOccupy,
+                                iter_dest_code,pxl_a){
   # a function to find feasible decision locations, we need this to limit the search space
   # The idea here is to for each location, to find a potential catchment
   # so it will limit the search space for the program
   # potential catchment is considered as the 20 min access
   
-  cellsToOccupy <- max(1,round(iter_dest$land_req[iter_dest_row]/pxl_a))
   
   feasible_nbhds <- iter_pixls %>% 
     mutate(wt=ifelse(type=="resid",yes = 0,no=1)) %>% 
@@ -206,10 +205,7 @@ findDestinationCells <- function(iter_pixls,iter_dest,iter_dest_row,
     sample_n(size = 1) %>% 
     as.character()
   
-  # Select a cell from the nbhds as the centre
-  # iter_nbhds %>% 
-  #   filter(nbhdQ==new_dest_nbhd)
-  
+
   centrePxl <- iter_pixls %>% 
     filter(nbhdQ==new_dest_nbhd) %>% 
     filter(type=="resid") %>% 
