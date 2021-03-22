@@ -1,0 +1,21 @@
+id,dest_type_id,name,destCode,land_req,pop_req,capacity,access_mode,dist_in_20_min,coverage,position,positionType,order
+1001,1001,Health Clinic,hc,0.000115,1000,1500,walking,0.842105263157895,0.95,all,free,9
+1002,1002,Corner Store/Convenience Store/Local shop,cs,0.000115,1000,1500,walking,0.842105263157895,0.95,all,free,9
+1003,1003,Local Park,lp,0.0085,1000,1500,walking,0.842105263157895,0.95,etc,free,3
+2001,2001,Multi_purpose_community_centre,mpcc,0.008,8000,12000,walking,1,0.8,ltc,free,1
+2002,2002,Childcare centre,cc,0.0025,9000,13500,walking,1,0.8,ltc,free,8
+2003,2003,Government primary school,gps,0.035,9000,13500,walking,1,0.8,etc,free,2
+2004,2004,District sports facility,dsf,0.08,9000,13500,walking,1,0.8,etc,free,8
+2005,2005,Larger supermarket,ls,0.003,10000,15000,walking,1,0.8,etc,free,8
+3001,3001,Neighbourhood house,nh,0,20000,30000,walking,1.14285714285714,0.7,mpcc,within,7
+3002,3002,Residential agedcare/retirement village/aged housing,ra,0.1,30000,45000,walking,1.14285714285714,0.7,ltc,free,7
+3003,3003,Community health centre,chc,0.006,30000,45000,walking,1.14285714285714,0.7,ltc,free,7
+3004,3004,Maternal and Child Health Centre,mchc,0.001,16000,24000,walking,1.14285714285714,0.7,ltc,free,7
+3005,3005,Occasional childcare centre ,occ,0,16000,24000,walking,1.14285714285714,0.7,mpcc,within,7
+3006,3006,Non-governmental Primary School,ngps,0.026,18000,27000,walking,1.14285714285714,0.7,lp,joined,5
+3007,3007,Government Secondary School,gss,0.084,30000,45000,walking,1.14285714285714,0.7,lp,joined,4
+3008,3008,Community arts facility,caf,0,30000,45000,walking,1.14285714285714,0.7,gps,within,7
+3009,3009,District Park,dp,0.04,30000,45000,walking,1.14285714285714,0.7,etc,free,6
+3010,3010,Lower order indoor recreational centre,loirc,0.006,20000,30000,walking,1.14285714285714,0.7,dp,joined,7
+3011,3011,Lower order Tennis courts,lotc,0.015,25000,37500,walking,1.14285714285714,0.7,dp,joined,7
+3012,3012,Regional supermarket,rs,0.0045,15000,22500,walking,1.14285714285714,0.7,nltc,free,7
