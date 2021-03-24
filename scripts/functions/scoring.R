@@ -1,6 +1,7 @@
 
-getScore <- function(pxlsTemp, destList){
-  tp <- pxlsTemp %>% 
+getScore <- function(pxlsDf, destList){
+  #pxlsDf <- pxlsInitial
+  tp <- pxlsDf %>% 
     group_by(destID) %>% 
     filter(destID!="NA") %>% 
     slice_sample(n=1) %>% 
@@ -8,7 +9,7 @@ getScore <- function(pxlsTemp, destList){
     dplyr::select(starts_with("pop_total")) %>% 
     sum()
   
-  tpr <- pxlsTemp %>% 
+  tpr <- pxlsDf %>% 
     group_by(destID) %>% 
     filter(destID!="NA") %>% 
     slice_sample(n=1) %>% 
@@ -16,7 +17,7 @@ getScore <- function(pxlsTemp, destList){
     select(starts_with("pop_remaining")) %>% 
     sum()
   
-  no <- pxlsTemp %>% 
+  no <- pxlsDf %>% 
     filter(destID!="NA") %>% 
     distinct(destID) %>% 
     nrow()
@@ -25,15 +26,15 @@ getScore <- function(pxlsTemp, destList){
   
   totalUnsrvdPop <-0
   for (dest in destList$dest_code) {
-    totalUnsrvdPop <- get_unsrvd_pop(pxlsTemp, dest) + totalUnsrvdPop
+    totalUnsrvdPop <- get_unsrvd_pop(pxlsDf, dest) + totalUnsrvdPop
   }
   
   scoreTemp <- 100*(totalUnsrvdPop/(pop*no)) +  deci_score
   if(is.na(scoreTemp)) scoreTemp=200
   
-  echo(paste("Iteration_Score,",scoreTemp, sep = ","))
-  echo(paste("Iteration_result,",scoreTemp, sep = ","))
-  
+  # echo(paste("Iteration_Score,",scoreTemp, sep = ","))
+  # echo(paste("Iteration_result,",scoreTemp, sep = ","))
+  # 
   return(scoreTemp)
   
 }
