@@ -28,7 +28,7 @@ echo<- function(msg) {
   cat(paste0(as.character(Sys.time()), ' | ', msg,"\n"))  
 }
 
-# dph <- 35
+dph <- 45
 optimise_nbhds <- function(dph) {
 
 # Step 0: Setting up inputs and structure ---------------------------------
@@ -485,18 +485,14 @@ optimise_nbhds <- function(dph) {
       
       if (scorePostMutation < scoreTemp) {
         # Keeping the mutation result
-        echo(paste0("Found a good mutation, destintation ID= ",destToUpdateID))
+        echo(paste0("Found a good mutation, destintation ID= ",destToUpdateID,
+                    ", delta= ",(scorePostMutation-scoreTemp)))
         pxlsTemp <- pxlsMutation
-        echo(paste0("Score before mutation = ",scoreTemp))
         scoreTemp <- scorePostMutation
-        echo(paste0("Score after mutation = ",scorePostMutation))
       }else{
-        echo(paste0("Not a good mutation, destintation ID= ",destToUpdateID))
-        echo(paste0("Score before mutation = ",scoreTemp))
-        echo(paste0("Score after mutation = ",scorePostMutation))
-        
+        echo(paste0("Not a good mutation, destintation ID= ",destToUpdateID,
+                    ", delta= ",(scorePostMutation-scoreTemp)))
         pxlsMutation <- pxlsTemp
-        
       }
     }
    
@@ -510,6 +506,8 @@ optimise_nbhds <- function(dph) {
       scoreTemp <- getScore(pxlsTemp, destList) 
     }
     if(scoreTemp<scoreBest){
+      echo(paste0("Old best score: ",scoreBest))
+      echo(paste0("New best score: ",scoreTemp))
       pxlsBest <- pxlsTemp
       scoreBest <- scoreTemp
     }else{
@@ -523,12 +521,12 @@ optimise_nbhds <- function(dph) {
       echo(paste0("Skipping the rest, model seems to be converged at iter ", iter))
       break
     } 
-    echo(paste0("Iteration: ", iter, "Finished"))
+    echo(paste0("Iteration: ", iter, "Finished, DPH: ",dph))
     iter <- iter + 1
-    pxlsTemp %>% 
-      mutate(density = dph) %>% 
-      st_as_sf(coords=c("pxl_x","pxl_y"), remove=F) %>% 
-      st_write(outputSqlite, remove=F,layer=paste0(dph,"dph_iter_",iter),delete_layer=T)
+    # pxlsTemp %>% 
+    #   mutate(density = dph) %>% 
+    #   st_as_sf(coords=c("pxl_x","pxl_y"), remove=F) %>% 
+    #   st_write(outputSqlite, remove=F,layer=paste0(dph,"dph_iter_",iter),delete_layer=T)
     
   } # End of While loop
   
@@ -554,11 +552,11 @@ share_land_for_resid <- 0.7 # share of land for residential
 pxl_d <- 0.025 # pixel diameter
 nbhd_d <- 1.6 # neighbourhood diameter
 consider_categories <- T 
-densities <- seq(from = 15, to = 45, by = 5) # dwelling per hectare
+densities <- seq(from = 40, to = 45, by = 5) # dwelling per hectare
 # Setting up folders ------------------------------------------------------
 
 
-output_dir <- "../outputs/Exp3_Mar24_1553/" # CHANGE THIS FOR DIFFERENT RUNS
+output_dir <- "../outputs/Exp3_Mar27_1230/" # CHANGE THIS FOR DIFFERENT RUNS
 ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
 
 output_deci_dir <- paste0(output_dir,"decisions") # CHANGE THIS FOR DIFFERENT RUNS
