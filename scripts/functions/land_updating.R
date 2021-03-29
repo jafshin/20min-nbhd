@@ -7,6 +7,25 @@ get_unsrvd_pop <- function(pxlsTemp, destCode){
   return(unsrvd)
 } 
 
+findSpace <- function(pxlsTemp,destCode, cellsToOccupy){
+  feasibleNbhdsQuarters <- pxlsTemp %>% 
+    mutate(wt=ifelse(type=="resid",yes = 0,no=1)) %>% 
+    group_by(nbhdQ) %>% 
+    summarise(catchment_potential = sum(.data[[paste0("not_served_by_", destCode)]]),
+              cells=n(),
+              cellsWithDest=sum(wt)) %>% 
+    filter(cellsToOccupy+cellsWithDest<0.35*cells) %>% # Making sure there is enough space
+    filter(catchment_potential>0) 
+  
+  hasSpace <- T
+  if (nrow(feasibleNbhdsQuarters)==0){
+    discardRunFlag <<- T 
+    hasSpace <- F
+    echo("Not enough Space - skipping")
+  }  
+  return(hasSpace)
+}
+
 # Feasible Location Finder ------------------------------------------------
 findDestinationCells <- function(pxlsTemp,destList,cellsToOccupy,
                                  destCode,pxl_a){
@@ -14,6 +33,7 @@ findDestinationCells <- function(pxlsTemp,destList,cellsToOccupy,
   # The idea here is to for each location, to find a potential catchment
   # so it will limit the search space for the program
   # potential catchment is considered as the 20 min access
+  # pxlsTemp <-pxlsInitial
   feasibleNbhdsQuarters <- pxlsTemp %>% 
     mutate(wt=ifelse(type=="resid",yes = 0,no=1)) %>% 
     group_by(nbhdQ) %>% 
