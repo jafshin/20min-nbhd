@@ -27,10 +27,8 @@ source("./functions/make_locations.R")
 echo<- function(msg) {
   cat(paste0(as.character(Sys.time()), ' | ', msg,"\n"))  
 }
-
-dph <- 45
+# dph <- 45
 optimise_nbhds <- function(dph) {
-
 # Step 0: Setting up inputs and structure ---------------------------------
   echo(paste0("******************* DWELLING DENSITY: ", dph))
   output_sub_dir <-  paste0(output_dir, "Density_", dph, "/") # one sub-dir for each density
@@ -42,13 +40,11 @@ optimise_nbhds <- function(dph) {
   echo(paste0("Total Population, ", pop))
   echo(paste0("Dweling Density, ", dph))
   echo(paste0("***********,", "***********"))
-  
   #  Destinations
   dests <- read.csv("../inputs/destinations_v6.csv") 
   # How many of each destination needed
   dests <- dests %>% 
     mutate(num_dests=ceiling(pop/dests$pop_req))
-
 # Step 1 Creating decision grid -------------------------------------------
   # Creating the neighbourhoods 
   nbhd_dev_area <- nbhd_d^2 * share_land_for_resid # land for development per nbhd
@@ -58,28 +54,24 @@ optimise_nbhds <- function(dph) {
   nbhds <- nbhds %>% # Adding Land for destinations as a var to nbhds
     mutate(land_for_dest = nbhd_d^2 * share_land_for_dest) %>% 
     mutate(remaining_land_for_dest = land_for_dest)
-  
   # Creating pixels
   pxl_a <- pxl_d*pxl_d
   pxl_dev_a <- pxl_a * share_land_for_resid # area in each pixel for population (this is used for applying density)
   pxl_n <- ceiling(pop * 0.01 / (dph * pphh * pxl_dev_a))
   pixls <- make_pixels_df(pxl_d, share_land_for_dest, pop, dph, 
                           pphh, study_area_d, nbhds) # creating pixles
-  
   # Replace nbhd coordinates with its centroid X and Y
   nbhds_geom <- nbhds[,"NBHD_ID"]
   nbhds <- nbhds %>%
     mutate(nbhd_x=as.numeric(sf::st_coordinates(st_centroid(.))[,1]),
            nbhd_y=as.numeric(sf::st_coordinates(st_centroid(.))[,2]))%>% 
     st_drop_geometry()  
-  
   # Replace cell coordinates with its centroid X and Y
   pixls_geom <- pixls[,"ID"]
   pixls <- pixls %>% 
     mutate(pxl_x=as.numeric(sf::st_coordinates(st_centroid(.))[,1]),
            pxl_y=as.numeric(sf::st_coordinates(st_centroid(.))[,2]))%>% 
     st_drop_geometry()
-  
   # Add distance to nbhd centre to cells
   pixls <- pixls %>% 
     left_join(nbhds[,c("NBHD_ID","nbhd_x","nbhd_y")], by = c("NBHD_ID")) %>% 
@@ -91,7 +83,6 @@ optimise_nbhds <- function(dph) {
                         yes = paste0(NBHD_ID,"_3"), no=nbhdQ)) %>% 
     mutate(nbhdQ=ifelse(test = pxl_x<nbhd_x & pxl_y>nbhd_y,
                         yes = paste0(NBHD_ID,"_4"), no=nbhdQ))  
-  
   avg_px_pop <- ceiling (pop / pxl_n) # Assuming homogeneous population distribution
   remaining_population <- pop 
   for (nb in nbhds$NBHD_ID) { # populating the pixles
@@ -103,7 +94,6 @@ optimise_nbhds <- function(dph) {
   }
   pixls <- pixls %>% filter(pxl_pop > 0) %>% # Just keeping the pixels with pop
     mutate(type="resid", destID="NA")
-  
   if (consider_categories) {
     # finding near the local town centres (400m)
     pixls <- pixls %>%  
@@ -113,19 +103,16 @@ optimise_nbhds <- function(dph) {
     pixls <- pixls %>%  
       mutate(position='all')  
   }
-  
   # Joining nbhds and pixels
   nbhds <- pixls %>%
     group_by(NBHD_ID) %>%
     summarise(pxls_pop = sum(pxl_pop)) %>%
     left_join(nbhds, by="NBHD_ID")  %>% 
     filter(pxls_pop>0)
-  
   # Sorting init dest based on pop_req*land_req
   # meaning starting from those big and high pop destinations
   dests <- dests %>%
     arrange(order,desc(land_req),desc(pop_req)) 
-  
   for(dest in dests$destCode){
     # Adding destinations to the pixels
     pixls <- pixls %>% 
@@ -134,8 +121,6 @@ optimise_nbhds <- function(dph) {
       mutate(!!paste0("pop_total_", dest):=0) %>% 
       mutate(!!paste0("pop_remaining_", dest):=0)
   }
-
-
 # Step 2: Initial layout  -------------------------------------------------
   nbhdsTemp <- nbhds # assigning iter specific variable nbhds
   destList <- dests # assigning iter specific variable destinations
@@ -147,14 +132,11 @@ optimise_nbhds <- function(dph) {
     destCode <- destList$destCode[destRow] # getting the dest type
     iter_dest_position <- destList$position[destRow] # getting the dest type
     echo(paste("destination:",destCode,"; dwelling denisty:",dph,sep=" "))
-    
     # FIRST destination OF TYPE destRow is also going through the evolutionary process
     # Repeating the process until all neighborhoods are served
     error_counter <- 0
     remaining_num_dests <- destList$num_dests[destRow]
-    while((get_unsrvd_pop(pxlsInitial, 
-                          destCode) > pop*(1-destList$coverage[destRow])) & 
-          (remaining_num_dests > 0)){ # loop until all are served AND we have destinations to use
+    while((remaining_num_dests > 0) & (get_unsrvd_pop(pxlsInitial,destCode) > pop*(1-destList$coverage[destRow]))){ # loop until we have destinations to use
       # CREATING A LIST OF DIFFERENT LOCATIONS AND THEIR POTENTIAL CATCHMENTS
       cellsToOccupy <- max(1,round(destList$land_req[destRow]/pxl_a))
       system.time(
@@ -166,7 +148,6 @@ optimise_nbhds <- function(dph) {
         No_Answer_flag <- TRUE
         break();
       }
-      
       # Add destination to the the cell
       pxlsInitial$type[destCellsRow] <- destCode
       remaining_num_dests <- remaining_num_dests - 1
@@ -482,7 +463,6 @@ optimise_nbhds <- function(dph) {
       
       # Evaluating the mutation
       scorePostMutation <- getScore(pxlsMutation, destList) 
-      
       if (scorePostMutation < scoreTemp) {
         # Keeping the mutation result
         echo(paste0("Found a good mutation, destintation ID= ",destToUpdateID,
@@ -495,8 +475,6 @@ optimise_nbhds <- function(dph) {
         pxlsMutation <- pxlsTemp
       }
     }
-   
-#   
     
 # Step7 Evaluation --------------------------------------------------------
     # Check the Score, If better keep, if not discard
@@ -529,7 +507,6 @@ optimise_nbhds <- function(dph) {
     #   st_write(outputSqlite, remove=F,layer=paste0(dph,"dph_iter_",iter),delete_layer=T)
     
   } # End of While loop
-  
   # writing the final outputs 
   echo(paste0("Final best score: ", scoreBest))
   # decision writing
@@ -537,7 +514,6 @@ optimise_nbhds <- function(dph) {
     mutate(density = dph) %>% 
     st_as_sf(coords=c("pxl_x","pxl_y"), remove=F) %>% 
     st_write(outputSqlite, remove=F,layer=paste0(dph,"_final"),delete_layer=T)
-  
   sink()
 }
 
@@ -552,26 +528,37 @@ share_land_for_resid <- 0.7 # share of land for residential
 pxl_d <- 0.025 # pixel diameter
 nbhd_d <- 1.6 # neighbourhood diameter
 consider_categories <- T 
-densities <- seq(from = 40, to = 45, by = 5) # dwelling per hectare
+densities <- seq(from = 15, to = 45, by = 5) # dwelling per hectare
 # Setting up folders ------------------------------------------------------
 
 
-output_dir <- "../outputs/Exp3_Mar27_1230/" # CHANGE THIS FOR DIFFERENT RUNS
-ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
-
-output_deci_dir <- paste0(output_dir,"decisions") # CHANGE THIS FOR DIFFERENT RUNS
-ifelse(!dir.exists(output_deci_dir), dir.create(output_deci_dir), FALSE)
-
-total_scores_file <- paste(output_dir, "score_summary.csv", sep = "")
-total_score_df <- data.frame(density = densities)
-
-outputSqlite <- paste0(output_deci_dir,"/pxls.sqlite")
-
-# iterating over densities ------------------------------------------------
-#dph <- densities[1] # dwelling per hectare
-for (dph in densities){
-  optimise_nbhds(dph)
+runs <- 2
+expTime <- format(Sys.time(),"%d%b%y_%H%M")
+for(run in 1:runs ){
+  
+  for(run in 1:runs ){
+    
+    output_dir <- paste0("../outputs/Exp3_",expTime)
+    ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
+    
+    output_dir <- paste0(output_dir,"/Dph",dph,"_Run",run,"/")
+    ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
+    
+    output_deci_dir <- paste0(output_dir,"decisions") # CHANGE THIS FOR DIFFERENT RUNS
+    ifelse(!dir.exists(output_deci_dir), dir.create(output_deci_dir), FALSE)
+    
+    
+    total_scores_file <- paste0(output_dir, "score_summary_Run",run,".csv")
+    total_score_df <- data.frame(density = densities)
+    
+    outputSqlite <- paste0(output_deci_dir,"/pxls_Run",run,".sqlite")
+    
+    optimise_nbhds(dph)
+  }
+  
+  
 }
+
 
 # lapply(densities, optimise_nbhds)  
 
