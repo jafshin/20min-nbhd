@@ -1,4 +1,4 @@
-id,dest_type_id,name,category,land_req_sqkm,pop_req,capacity,access_mode,dist_in_20_min,coverage,location
+id,dest_type_id,name,category,land_req,pop_req,capacity,access_mode,dist_in_20_min,coverage,location
 1001,1001,Multi_purpose_community_centre,sport_and_recreation,0.008,8000,12000,walking,0.8,0.8,c
 1005,1005,Health Clinic,health_facilities_and_services,0.000115,1000,1500,walking,0.8,0.8,c
 1008,1008,Childcare centre,learning,0.0025,9000,13500,walking,0.8,0.8,c

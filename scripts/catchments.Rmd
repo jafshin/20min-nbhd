@@ -26,7 +26,6 @@ TODO:
 
 ```{r initial parameters}
 
-
 pphh <- 2.6
 total_pop <- 10000
 mutation_p <- 0.20
@@ -48,7 +47,6 @@ nbhds_area <- nbhd_diameter * nbhd_diameter # As squares (sq.km)
 #nbhds_area <- 0.4*0.4*pi # As circles (sq.km)
 nbhds_counter <- ceiling(total_pop * 0.01 / (dwelling_per_h * pphh * nbhds_area))
 
-
 ```
 
 ## Calculating the catchments and coverages
@@ -69,7 +67,6 @@ calc_catchment <- function(pop, dens, pphh){
 calc_ww_catchment <- function(pop, dens, pphh, coverage){
   return((pop*coverage*0.01)/(dens*pphh))
 }
-
 
 calc_coverage <- function(r,r1,ca,r2=0.8){
   
