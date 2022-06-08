@@ -26,7 +26,7 @@ source("./functions/make_locations.R")
 
 echo<- function(msg) {
   cat(paste0(as.character(Sys.time()), ' | ', msg,"\n"))  
-}
+} 
 # dph <- 45
 optimise_nbhds <- function(dph) {
 # Step 0: Setting up inputs and structure ---------------------------------
@@ -523,20 +523,20 @@ pop <- 60000 # total population
 mutation_p <- 0.10 # mutate rate for optimization
 iters_max <- 50 # max number of iterations
 convergenceIterations <- 5
-share_land_for_dest <- 0.35 # share of land for dest
+share_land_for_dest <- 0.3 # share of land for dest
 share_land_for_resid <- 0.7 # share of land for residential
 pxl_d <- 0.025 # pixel diameter
 nbhd_d <- 1.6 # neighbourhood diameter
-consider_categories <- T 
+consider_categories <- T  
 densities <- seq(from = 15, to = 45, by = 5) # dwelling per hectare
 # Setting up folders ------------------------------------------------------
 
-
-runs <- 2
+runs <- 10
 expTime <- format(Sys.time(),"%d%b%y_%H%M")
-for(run in 1:runs ){
+for (dph in densities){
   
   for(run in 1:runs ){
+    dir.create("../outputs/", showWarnings = FALSE)
     
     output_dir <- paste0("../outputs/Exp3_",expTime)
     ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
@@ -560,7 +560,6 @@ for(run in 1:runs ){
 }
 
 
-# lapply(densities, optimise_nbhds)  
 
 #library(doParallel)  
 #no_cores <- min(( detectCores() - 1 ),  length(densities))
