@@ -27,7 +27,7 @@ source("./functions/make_locations.R")
 echo<- function(msg) {
   cat(paste0(as.character(Sys.time()), ' | ', msg,"\n"))  
 } 
-# dph <- 45
+# dph <- 40
 optimise_nbhds <- function(dph) {
 # Step 0: Setting up inputs and structure ---------------------------------
   echo(paste0("******************* DWELLING DENSITY: ", dph))
@@ -41,7 +41,7 @@ optimise_nbhds <- function(dph) {
   echo(paste0("Dweling Density, ", dph))
   echo(paste0("***********,", "***********"))
   #  Destinations
-  dests <- read.csv("../inputs/destinations_v6.csv") 
+  dests <- read.csv("../inputs/destinations_v7.csv") 
   # How many of each destination needed
   dests <- dests %>% 
     mutate(num_dests=ceiling(pop/dests$pop_req))
@@ -58,7 +58,7 @@ optimise_nbhds <- function(dph) {
   pxl_a <- pxl_d*pxl_d
   pxl_dev_a <- pxl_a * share_land_for_resid # area in each pixel for population (this is used for applying density)
   pxl_n <- ceiling(pop * 0.01 / (dph * pphh * pxl_dev_a))
-  pixls <- make_pixels_df(pxl_d, share_land_for_dest, pop, dph, 
+  pixls <- make_pixels_df(pxl_d, pop, dph, 
                           pphh, study_area_d, nbhds) # creating pixles
   # Replace nbhd coordinates with its centroid X and Y
   nbhds_geom <- nbhds[,"NBHD_ID"]
@@ -218,13 +218,13 @@ optimise_nbhds <- function(dph) {
     filter(type!="resid") %>% 
     summarise(homelessPop = sum(pxl_pop)) %>% 
     unlist()
-  
+  # echo("here1-1")
   hostPxls <- pxlsInitial %>% 
     filter(type=="resid") %>% 
     filter(pxl_pop>0) %>% 
     dplyr::select(ID) %>%
     slice_sample(n=homelessPop,replace=T)
-  
+  # echo("here1-2")
   popServCols <- grep("not_",colnames(pxlsInitial))
   nonResids <- which(pxlsInitial$type!="resid" & pxlsInitial$pxl_pop>0)
   pxlsInitial[nonResids,"pxl_pop"] <- 0
@@ -343,6 +343,7 @@ optimise_nbhds <- function(dph) {
   while(iter < iters_max + 1){
     echo(paste0("Starting iteration: ", iter))
     # Select some dests to mutate:
+    # echo("here2_1")
     destsToUpdate <- pxlsTemp %>% 
       filter(destID!="NA") %>%  
       group_by(destID,type) %>% 
@@ -350,7 +351,7 @@ optimise_nbhds <- function(dph) {
       ungroup() %>% 
       slice_sample(prop=mutation_p) %>% 
       as.data.frame()
-    
+    # echo("here2_2")
     # Changing the locations with free cells
     pxlsMutation <- pxlsTemp
     # i=12
@@ -523,12 +524,12 @@ pop <- 60000 # total population
 mutation_p <- 0.10 # mutate rate for optimization
 iters_max <- 50 # max number of iterations
 convergenceIterations <- 5
-share_land_for_dest <- 0.3 # share of land for dest
-share_land_for_resid <- 0.7 # share of land for residential
+share_land_for_dest <- 0.15 # share of land for dest
+share_land_for_resid <- 0.85 # share of land for residential
 pxl_d <- 0.025 # pixel diameter
 nbhd_d <- 1.6 # neighbourhood diameter
 consider_categories <- T  
-densities <- seq(from = 15, to = 45, by = 5) # dwelling per hectare
+densities <- seq(from = 45, to = 45, by = 5) # dwelling per hectare
 # Setting up folders ------------------------------------------------------
 
 runs <- 10

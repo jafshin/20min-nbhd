@@ -41,7 +41,7 @@ optimise_nbhds <- function(dph) {
   echo(paste0("***********,", "***********"))
   
   #  Destinations
-  dests <- read.csv("../inputs/destinations_v6.csv") 
+  dests <- read.csv("../inputs/destinations_v7.csv") 
   # # How many of each destination needed
   # dests <- dests %>% 
   #   mutate(num_dests=ceiling(pop/dests$pop_req))
@@ -60,7 +60,7 @@ optimise_nbhds <- function(dph) {
   pxl_a <- pxl_d*pxl_d
   pxl_dev_a <- pxl_a * share_land_for_resid # area in each pixel for population (this is used for applying density)
   pxl_n <- ceiling(pop * 0.01 / (dph * pphh * pxl_dev_a))
-  pixls <- make_pixels_df(pxl_d, share_land_for_dest, pop, dph, 
+  pixls <- make_pixels_df(pxl_d, pop, dph, 
                           pphh, study_area_d, nbhds) # creating pixles
   
   # Replace nbhd coordinates with its centroid X and Y
@@ -162,7 +162,7 @@ optimise_nbhds <- function(dph) {
     discardRunFlag <<- F
     while((get_unsrvd_pop(pxlsInitial,destCode) > pop*(1-destList$coverage[destRow]))&
           num_dests<max_dests &
-          findSpace(pxlsInitial,destCode,cellsToOccupy, discardRunFlag)){ # loop until all are served AND we have destinations to use
+          findSpace(pxlsInitial,destCode,cellsToOccupy)){ # loop until all are served AND we have destinations to use
      
       # CREATING A LIST OF DIFFERENT LOCATIONS AND THEIR POTENTIAL CATCHMENTS
       system.time(
@@ -548,12 +548,12 @@ pop <- 60000 # total population
 mutation_p <- 0.10 # mutate rate for optimization
 iters_max <- 50 # max number of iterations
 convergenceIterations <- 5
-share_land_for_dest <- 0.3 # share of land for dest
-share_land_for_resid <- 0.7 # share of land for residential
+share_land_for_dest <- 0.15 # share of land for dest
+share_land_for_resid <- 0.85 # share of land for residential
 pxl_d <- 0.025 # pixel diameter
 nbhd_d <- 1.6 # neighbourhood diameter
 consider_categories <- T 
-densities <- seq(from = 15, to = 45, by = 5) # dwelling per hectare
+densities <- seq(from = 45, to = 45, by = 5) # dwelling per hectare
 runs <- 10
  
 expTime <- format(Sys.time(),"%d%b%y_%H%M")

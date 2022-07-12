@@ -1,4 +1,4 @@
-make_pixels_df <- function(pxl_d, share_land_for_dest, total_pop, dwelling_per_h, person_per_hh, study_area_d, nbhd_sq){
+make_pixels_df <- function(pxl_d, total_pop, dwelling_per_h, person_per_hh, study_area_d, nbhd_sq){
  
   # Making initial nbhds df
   my_seq <- seq(from = -(study_area_d/2)+pxl_d, to = (study_area_d/2)-pxl_d, by = pxl_d)
