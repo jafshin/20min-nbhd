@@ -41,7 +41,7 @@ optimise_nbhds <- function(dph) {
   echo(paste0("Dweling Density, ", dph))
   echo(paste0("***********,", "***********"))
   #  Destinations
-  dests <- read.csv("../inputs/destinations_v7.csv") 
+  dests <- read.csv("../inputs/destinations_v8.csv") 
   # How many of each destination needed
   dests <- dests %>% 
     mutate(num_dests=ceiling(pop/dests$pop_req))
@@ -130,6 +130,7 @@ optimise_nbhds <- function(dph) {
   # destRow=1
   for(destRow in 1:nrow(destList)){
     destCode <- destList$destCode[destRow] # getting the dest type
+    destLvl <- destList$lvl[destRow] # getting the dest level
     iter_dest_position <- destList$position[destRow] # getting the dest type
     echo(paste("destination:",destCode,"; dwelling denisty:",dph,sep=" "))
     # FIRST destination OF TYPE destRow is also going through the evolutionary process
@@ -141,7 +142,7 @@ optimise_nbhds <- function(dph) {
       cellsToOccupy <- max(1,round(destList$land_req[destRow]/pxl_a))
       system.time(
         destCellsID <- findDestinationCells(pxlsInitial,destList,cellsToOccupy,
-                                                      destCode,pxl_a))
+                                                      destCode,pxl_a,destLvl))
       destCellsRow <- which(pxlsInitial$ID%in%destCellsID)
       if(length(destCellsID)==0){ 
         echo("No Answer")
@@ -359,11 +360,12 @@ optimise_nbhds <- function(dph) {
       
       destToUpdateID <- destsToUpdate[i,"destID"]
       destToUpdateType <- destsToUpdate[i,"type"]
+      destToUpdateLvl <- destsToUpdate[i,"lvl"]
       pxlsToMove <- destsToUpdate[i,"areaPxls"]
       origCells <- which(pxlsMutation$destID==destToUpdateID)
       # Find where to move
       system.time(destCellsID <- findDestinationCells(pxlsMutation,destList,pxlsToMove,
-                                                      destToUpdateType,pxl_a))
+                                                      destToUpdateType,pxl_a,destToUpdateLvl))
       if(length(destCellsID)==0){
         echo("No Answer")
         No_Answer_flag <- TRUE
@@ -529,7 +531,7 @@ share_land_for_resid <- 0.85 # share of land for residential
 pxl_d <- 0.025 # pixel diameter
 nbhd_d <- 1.6 # neighbourhood diameter
 consider_categories <- T  
-densities <- seq(from = 45, to = 45, by = 5) # dwelling per hectare
+densities <- seq(from = 15, to = 45, by = 5) # dwelling per hectare
 # Setting up folders ------------------------------------------------------
 
 runs <- 10

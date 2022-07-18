@@ -553,7 +553,7 @@ share_land_for_resid <- 0.85 # share of land for residential
 pxl_d <- 0.025 # pixel diameter
 nbhd_d <- 1.6 # neighbourhood diameter
 consider_categories <- T 
-densities <- seq(from = 45, to = 45, by = 5) # dwelling per hectare
+densities <- seq(from = 15, to = 45, by = 5) # dwelling per hectare
 runs <- 10
  
 expTime <- format(Sys.time(),"%d%b%y_%H%M")
