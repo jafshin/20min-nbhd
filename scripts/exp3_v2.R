@@ -27,12 +27,12 @@ source("./functions/make_locations.R")
 echo<- function(msg) {
   cat(paste0(as.character(Sys.time()), ' | ', msg,"\n"))  
 } 
-# dph <- 40
+# dph <- 15
 optimise_nbhds <- function(dph) {
 # Step 0: Setting up inputs and structure ---------------------------------
   echo(paste0("******************* DWELLING DENSITY: ", dph))
   output_sub_dir <-  paste0(output_dir, "Density_", dph, "/") # one sub-dir for each density
-  print(output_sub_dir)
+  #print(output_sub_dir)
   ifelse(!dir.exists(output_sub_dir), dir.create(output_sub_dir), FALSE) # create if not exists
   log_file <- paste0(output_sub_dir, "output_log_D", dph, ".txt")  # log file for keeping the record
   sink(log_file, append=FALSE, split=TRUE) # sink to both console and log file
@@ -45,7 +45,8 @@ optimise_nbhds <- function(dph) {
   # How many of each destination needed
   dests <- dests %>% 
     mutate(num_dests=ceiling(pop/dests$pop_req))
-# Step 1 Creating decision grid -------------------------------------------
+# Step 1 Creating decision grid -------------------------------------------\
+  echo("Step 1 starts - Creating decision grid")
   # Creating the neighbourhoods 
   nbhd_dev_area <- nbhd_d^2 * share_land_for_resid # land for development per nbhd
   nbhd_n <- ceiling(pop * 0.01 / (dph * pphh * nbhd_dev_area)) # number of nbhds
@@ -61,7 +62,9 @@ optimise_nbhds <- function(dph) {
   pixls <- make_pixels_df(pxl_d, pop, dph, 
                           pphh, study_area_d, nbhds) # creating pixles
   # Replace nbhd coordinates with its centroid X and Y
-  nbhds_geom <- nbhds[,"NBHD_ID"]
+ 
+  #     mutate(position='all')  
+  # } nbhds_geom <- nbhds[,"NBHD_ID"]
   nbhds <- nbhds %>%
     mutate(nbhd_x=as.numeric(sf::st_coordinates(st_centroid(.))[,1]),
            nbhd_y=as.numeric(sf::st_coordinates(st_centroid(.))[,2]))%>% 
@@ -94,15 +97,7 @@ optimise_nbhds <- function(dph) {
   }
   pixls <- pixls %>% filter(pxl_pop > 0) %>% # Just keeping the pixels with pop
     mutate(type="resid", destID="NA")
-  if (consider_categories) {
-    # finding near the local town centres (400m)
-    pixls <- pixls %>%  
-      mutate(position=ifelse(dist2ltc<0.4, yes = "nltc", no = "etc")) %>% 
-      mutate(position=ifelse(dist2ltc<0.01, yes = "ltc", no = position)) 
-  }else{
-    pixls <- pixls %>%  
-      mutate(position='all')  
-  }
+
   # Joining nbhds and pixels
   nbhds <- pixls %>%
     group_by(NBHD_ID) %>%
@@ -121,28 +116,36 @@ optimise_nbhds <- function(dph) {
       mutate(!!paste0("pop_total_", dest):=0) %>% 
       mutate(!!paste0("pop_remaining_", dest):=0)
   }
-# Step 2: Initial layout  -------------------------------------------------
+  echo("Finished Creating decision grid (Step 1)")
+  # Step 2: Initial layout  -------------------------------------------------
+  echo("Starting Creating initial layout (Step 2)")
   nbhdsTemp <- nbhds # assigning iter specific variable nbhds
   destList <- dests # assigning iter specific variable destinations
   pxlsInitial <- pixls # assigning iter specific variable pixels
   No_Answer_flag <- FALSE # a flag for when no answer will be found
   # Loop over all destinations
   # destRow=1
+  echo("Looping over all destinations and allocating initial locations")
+  
   for(destRow in 1:nrow(destList)){
     destCode <- destList$destCode[destRow] # getting the dest type
     destLvl <- destList$lvl[destRow] # getting the dest level
+    cellsToOccupy <- max(1,round(destList$land_req[destRow]/pxl_a))
+    destRadius <- sqrt(destList$land_req[destRow]/pi)
     iter_dest_position <- destList$position[destRow] # getting the dest type
-    echo(paste("destination:",destCode,"; dwelling denisty:",dph,sep=" "))
+    
     # FIRST destination OF TYPE destRow is also going through the evolutionary process
-    # Repeating the process until all neighborhoods are served
+    echo(paste("destination:",destCode,"; dwelling denisty:",dph,sep=" "))
+    
     error_counter <- 0
     remaining_num_dests <- destList$num_dests[destRow]
+    # Repeating the process until all neighborhoods are served
     while((remaining_num_dests > 0) & (get_unsrvd_pop(pxlsInitial,destCode) > pop*(1-destList$coverage[destRow]))){ # loop until we have destinations to use
       # CREATING A LIST OF DIFFERENT LOCATIONS AND THEIR POTENTIAL CATCHMENTS
-      cellsToOccupy <- max(1,round(destList$land_req[destRow]/pxl_a))
+
       system.time(
         destCellsID <- findDestinationCells(pxlsInitial,destList,cellsToOccupy,
-                                                      destCode,pxl_a,destLvl))
+                                            destCode,pxl_a,destLvl,destRadius))
       destCellsRow <- which(pxlsInitial$ID%in%destCellsID)
       if(length(destCellsID)==0){ 
         echo("No Answer")
@@ -163,7 +166,6 @@ optimise_nbhds <- function(dph) {
       pxlsInitial[destCellsRow,totalPopCol] <- destList[destRow,"capacity"]
       pxlsInitial[destCellsRow,reminderPopCol] <- destList[destRow,"capacity"]
       pxlsInitial[destCellsRow,numDestCol] <- 1
-      
       # Start serving people around
       destGeom <- pxlsInitial %>% 
         filter(ID%in%destCellsID) %>% 
@@ -182,7 +184,7 @@ optimise_nbhds <- function(dph) {
         st_drop_geometry() %>% 
         arrange(dist2Dest) %>%
         dplyr::select(ID)
-      
+   
       if(!nrow(cellsWithinDistID) > 0) message("**Something is not right**")
       if(!nrow(cellsWithinDistID) > 0) stop()
       # Serving cells 
@@ -204,7 +206,6 @@ optimise_nbhds <- function(dph) {
         pxlsInitial[which(pxlsInitial$ID %in% cellsWithinDistID$ID),] <- closeCells
         pxlsInitial[destCellsRow,reminderPopCol] <- remainingCap
       })
-      
     }
   }
   pxlsInitial %>% 
@@ -213,8 +214,11 @@ optimise_nbhds <- function(dph) {
   # In this step, population from pixels occupied with dests will be removed
   # And will be uniformly distributed in other locations
   # We will use random samples in order to redistribute
-
+  echo("Finished Creating initial layout (Step 2)")
+  
 # Step 3: Updating demand distribution ------------------------------------
+  echo("Starting Updating demand distribution (step3)")
+  
   homelessPop <- pxlsInitial %>%
     filter(type!="resid") %>% 
     summarise(homelessPop = sum(pxl_pop)) %>% 
@@ -323,8 +327,9 @@ optimise_nbhds <- function(dph) {
       })
     }
   }
-  echo("Finished building the initial layout")
-# Step 4: Scoring ---------------------------------------------------------
+  echo("Finished Updating demand distribution (step3)")
+  # Step 4: Scoring ---------------------------------------------------------
+  echo("Starting Scoring (step4)")
   
   if(No_Answer_flag){  
     scoreTemp <- nrow(dests)*(200)
@@ -334,17 +339,21 @@ optimise_nbhds <- function(dph) {
     pxlsBest <- pxlsInitial
     scoreBest <- scoreTemp
   }
+  echo("Finished Scoring (step4)")
+  
   echo(paste0("Initial layout score: ", scoreBest))
   
 # Step5: Mutating Supply --------------------------------------------------
+  echo("Starting Mutating Supply (step 5)")
+  
 ### Here is where the While loop should start
   pxlsTemp <- pxlsInitial
   iter <- 1
   convergenceCounter <- 0
   while(iter < iters_max + 1){
     echo(paste0("Starting iteration: ", iter))
+    
     # Select some dests to mutate:
-    # echo("here2_1")
     destsToUpdate <- pxlsTemp %>% 
       filter(destID!="NA") %>%  
       group_by(destID,type) %>% 
@@ -352,7 +361,8 @@ optimise_nbhds <- function(dph) {
       ungroup() %>% 
       slice_sample(prop=mutation_p) %>% 
       as.data.frame()
-    # echo("here2_2")
+    if(nrow(destsToUpdate)==0) echo("Mutation skipped")
+    if(nrow(destsToUpdate)!=0){
     # Changing the locations with free cells
     pxlsMutation <- pxlsTemp
     # i=12
@@ -360,12 +370,16 @@ optimise_nbhds <- function(dph) {
       
       destToUpdateID <- destsToUpdate[i,"destID"]
       destToUpdateType <- destsToUpdate[i,"type"]
-      destToUpdateLvl <- destsToUpdate[i,"lvl"]
       pxlsToMove <- destsToUpdate[i,"areaPxls"]
+      destToUpdateLvl <- destList[which(destList[,"destCode"]==destToUpdateType),"lvl"]
+      destToUpdateRadius <- sqrt(destList[which(destList[,"destCode"]==destToUpdateType),"land_req"]/pi)
+
       origCells <- which(pxlsMutation$destID==destToUpdateID)
       # Find where to move
       system.time(destCellsID <- findDestinationCells(pxlsMutation,destList,pxlsToMove,
-                                                      destToUpdateType,pxl_a,destToUpdateLvl))
+                                                      destToUpdateType,pxl_a,
+                                                      destToUpdateLvl,
+                                                      destToUpdateRadius))
       if(length(destCellsID)==0){
         echo("No Answer")
         No_Answer_flag <- TRUE
@@ -509,7 +523,9 @@ optimise_nbhds <- function(dph) {
     #   st_as_sf(coords=c("pxl_x","pxl_y"), remove=F) %>% 
     #   st_write(outputSqlite, remove=F,layer=paste0(dph,"dph_iter_",iter),delete_layer=T)
     
+    } # end of if 
   } # End of While loop
+  
   # writing the final outputs 
   echo(paste0("Final best score: ", scoreBest))
   # decision writing
@@ -537,10 +553,12 @@ densities <- seq(from = 15, to = 45, by = 5) # dwelling per hectare
 runs <- 10
 expTime <- format(Sys.time(),"%d%b%y_%H%M")
 for (dph in densities){
-  
+  #run <- 1
   for(run in 1:runs ){
     dir.create("../outputs/", showWarnings = FALSE)
     
+    echo(paste0("Starting dph ", dph, " run ", run))
+
     output_dir <- paste0("../outputs/Exp3_",expTime)
     ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
     

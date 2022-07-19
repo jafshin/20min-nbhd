@@ -7,50 +7,48 @@ get_unsrvd_pop <- function(pxlsTemp, destCode){
   return(unsrvd)
 } 
 
-findSpace <- function(pxlsTemp,destCode, cellsToOccupy,lvl){
+findSpace <- function(pxlsTemp,destCode, cellsToOccupy,destLvl){
   
-
+  if(destLvl==1) pxlsTempGrpd <- pxlsTemp %>% group_by(nbhdQ)
+  if(destLvl==2) pxlsTempGrpd <- pxlsTemp %>% group_by(NBHD_ID)
+  if(destLvl==3) pxlsTempGrpd <- pxlsTemp 
   
-  
-  
-  
-  feasibleNbhdsQuarters <- pxlsTemp %>% 
+  feasibleArea <- pxlsTempGrpd %>% 
     mutate(wt=ifelse(type=="resid",yes = 0,no=1)) %>% 
-    group_by(nbhdQ) %>% 
     summarise(area_catchment_potential = sum(.data[[paste0("not_served_by_", destCode)]]),
               cells=n(),
               cellsWithDest=sum(wt)) %>% 
     filter(cellsToOccupy+cellsWithDest<0.35*cells) %>% # Making sure there is enough space
-    filter(area_catchment_potential>0) 
+    filter(area_catchment_potential>0) %>% 
+    arrange(desc(area_catchment_potential)) 
   
-  if(nrow(feasibleNbhdsQuarters)==0){
+  if(nrow(feasibleArea)==0){
     echo("increasing destination space to 50%")
-    
-    feasibleNbhdsQuarters <- pxlsTemp %>% 
+    feasibleArea <- pxlsTempGrpd %>% 
       mutate(wt=ifelse(type=="resid",yes = 0,no=1)) %>% 
-      group_by(nbhdQ) %>% 
       summarise(area_catchment_potential = sum(.data[[paste0("not_served_by_", destCode)]]),
                 cells=n(),
                 cellsWithDest=sum(wt)) %>% 
       filter(cellsToOccupy+cellsWithDest<0.5*cells) %>% # Making sure there is enough space
-      filter(area_catchment_potential>0) 
+      filter(area_catchment_potential>0) %>% 
+      arrange(desc(area_catchment_potential)) 
   }
   
-  if(nrow(feasibleNbhdsQuarters)==0){
-    echo("increasing destination space to 75%")
-    
-    feasibleNbhdsQuarters <- pxlsTemp %>% 
-      mutate(wt=ifelse(type=="resid",yes = 0,no=1)) %>% 
-      group_by(nbhdQ) %>% 
-      summarise(area_catchment_potential = sum(.data[[paste0("not_served_by_", destCode)]]),
-                cells=n(),
-                cellsWithDest=sum(wt)) %>% 
-      filter(cellsToOccupy+cellsWithDest<0.75*cells) %>% # Making sure there is enough space
-      filter(catchment_potential>0) 
-  }
+  # if(nrow(feasibleNbhdsQuarters)==0){
+  #   echo("increasing destination space to 75%")
+  #   
+  #   feasibleNbhdsQuarters <- pxlsTemp %>% 
+  #     mutate(wt=ifelse(type=="resid",yes = 0,no=1)) %>% 
+  #     group_by(nbhdQ) %>% 
+  #     summarise(area_catchment_potential = sum(.data[[paste0("not_served_by_", destCode)]]),
+  #               cells=n(),
+  #               cellsWithDest=sum(wt)) %>% 
+  #     filter(cellsToOccupy+cellsWithDest<0.75*cells) %>% # Making sure there is enough space
+  #     filter(catchment_potential>0) 
+  # }
   
   hasSpace <- T
-  if (nrow(feasibleNbhdsQuarters)==0){
+  if (nrow(feasibleArea)==0){
     discardRunFlag <<- T 
     hasSpace <- F
     echo("Not enough Space - skipping")
@@ -60,7 +58,7 @@ findSpace <- function(pxlsTemp,destCode, cellsToOccupy,lvl){
 
 # Feasible Location Finder ------------------------------------------------
 findDestinationCells <- function(pxlsTemp,destList,cellsToOccupy,
-                                 destCode,pxl_a,destLvl){
+                                 destCode,pxl_a,destLvl,destRadius){
   
   # a function to find feasible decision locations, we need this to limit the search space
   # The idea here is to for each location, to find a potential catchment
@@ -68,164 +66,102 @@ findDestinationCells <- function(pxlsTemp,destList,cellsToOccupy,
   # potential catchment is considered as the 20 min access
   #pxlsTemp <-pxlsInitial
   
-  if(destLvl==1){
-    pxlsTempGrpd <- pxlsTemp %>% group_by(nbhdQ)
-    
+  if(destLvl==1) pxlsTempGrpd <- pxlsTemp %>% group_by(nbhdQ)
+  if(destLvl==2) pxlsTempGrpd <- pxlsTemp %>% group_by(NBHD_ID)
+  if(destLvl==3) pxlsTempGrpd <- pxlsTemp 
+  
+  feasibleArea <- pxlsTempGrpd %>% 
+    mutate(wt=ifelse(type=="resid",yes = 0,no=1)) %>% 
+    summarise(area_catchment_potential = sum(.data[[paste0("not_served_by_", destCode)]]),
+              cells=n(),
+              cellsWithDest=sum(wt)) %>% 
+    filter(cellsToOccupy+cellsWithDest<0.35*cells) %>% # Making sure there is enough space
+    filter(area_catchment_potential>0) %>% 
+    arrange(desc(area_catchment_potential)) 
+  
+  if(nrow(feasibleArea)==0){
+    echo("increasing destination space to 50%")
     feasibleArea <- pxlsTempGrpd %>% 
       mutate(wt=ifelse(type=="resid",yes = 0,no=1)) %>% 
       summarise(area_catchment_potential = sum(.data[[paste0("not_served_by_", destCode)]]),
                 cells=n(),
                 cellsWithDest=sum(wt)) %>% 
-      filter(cellsToOccupy+cellsWithDest<0.35*cells) %>% # Making sure there is enough space
+      filter(cellsToOccupy+cellsWithDest<0.5*cells) %>% # Making sure there is enough space
       filter(area_catchment_potential>0) %>% 
       arrange(desc(area_catchment_potential)) 
-    
-    
-    if(nrow(feasibleArea)==0){
-      echo("increasing destination space to 50%")
-      feasibleArea <- pxlsTempGrpd %>% 
-        mutate(wt=ifelse(type=="resid",yes = 0,no=1)) %>% 
-        summarise(area_catchment_potential = sum(.data[[paste0("not_served_by_", destCode)]]),
-                  cells=n(),
-                  cellsWithDest=sum(wt)) %>% 
-        filter(cellsToOccupy+cellsWithDest<0.5*cells) %>% # Making sure there is enough space
-        filter(area_catchment_potential>0) %>% 
-        arrange(desc(area_catchment_potential)) 
-    }
-    
-    destPositionPref <- destList[which(destList$destCode==destCode),"position"]
-
-    areasWithPreferedDest<- pxlsTempGrpd %>% 
-      filter(type==destPositionPref) %>% 
-      summarise() %>% 
-      unlist()
-    
+  }
+  
+  destPositionPref <- destList[which(destList$destCode==destCode),"position"]
+  
+  # Finding the best area based on the level 
+  
+  areasWithPreferedDest<- pxlsTempGrpd %>% 
+    filter(type==destPositionPref) %>% 
+    summarise() %>% 
+    unlist()
+  
+  if(destLvl==1) {
     feasibleArea <- feasibleArea %>% filter(nbhdQ%in%areasWithPreferedDest)
-    
+    # Selecting the best area based on the level
     newDestArea <- feasibleArea %>%
       filter(area_catchment_potential == max(area_catchment_potential)) %>%
       dplyr::select(nbhdQ) %>% 
       sample_n(size = 1) %>% 
       as.character()
-    
-    cellsInArea <- pxlsTemp %>% 
-      filter(nbhdQ==newDestArea)  
-    
-    if(destPositionPref=="resid"){
-    # Lets do 10 instead
-    sampleCells <- cellsInArea %>% 
-      filter(type=="resid") %>% 
-      sample_n(10) 
-    }else{
-      sampleCells <- cellsInArea %>%
-        filter(type==destPositionPref)
+    cellsInArea <- pxlsTemp %>% filter(nbhdQ==newDestArea)
     }
-    
-    for(i in 1:nrow(sampleCells)){
-      x <- sampleCells[i,"pxl_x"]
-      y <- sampleCells[i,"pxl_y"]
-      echo(paste(x,y))
-      
-      cellsInRadius <- sampleCells %>% 
-        mutate(dist = )
-      
-    }
-      
-    
-    
-    
-    
-    
-    
-    centrePxl <- pxlsTemp %>% 
-      filter(nbhdQ==newDestArea) %>% 
-      filter(type=="resid") %>% 
-      sample_n(1) %>% 
-      st_as_sf(coords=c("pxl_x","pxl_y"), remove=F)
-      
-    if(destPositionPref=="joined" | destPositionPref=="free"){
-      # echo("here3_3")
-      centrePxl <- pxlsTemp %>% 
-        filter(nbhdQ==newDestNbhd) %>% 
-        filter(type=="resid") %>% 
-        sample_n(1) %>% 
-        st_as_sf(coords=c("pxl_x","pxl_y"), remove=F)
-      # echo("here3_4")
-    }
-    if(destPositionPref=="within"){
-      # echo("here3_5")
-      centrePxl <- pxlsTemp %>% 
-        filter(nbhdQ==newDestNbhd) %>% 
-        filter(type==destTypePref) %>% 
-        sample_n(1) %>% 
-        st_as_sf(coords=c("pxl_x","pxl_y"), remove=F)
-      # echo("here3_6")
-    }
-    
-    closePxls <- centrePxl %>% 
-      st_buffer(0.4) %>% 
-      st_intersection(pxlsTemp %>% 
-                        filter(type=="resid") %>% 
-                        st_as_sf(coords=c("pxl_x","pxl_y"))) %>% 
-      mutate(dist2Pxl = st_distance(.,centrePxl)) %>% 
-      arrange(dist2Pxl)
-    
-    plxs4Dest <- closePxls %>%  slice_head(n=cellsToOccupy)
-    
-    
-    
-  } 
-  if(destLvl==2) pxlsTempGrpd <- pxlsTemp %>% group_by(NBHD_ID)
-  if(destLvl==3) pxlsTempGrpd <- pxlsTemp 
-
-  
- 
-  
-
-  
-  # destPositionPref <- destList[which(destList$destCode==destCode),"positionType"]
-  
-
-  
-  # Feasible area
-  
-
-  if(destLvl== 2 & destTypePref!="all"){
+  if(destLvl==2){
     feasibleArea <- feasibleArea %>% filter(NBHD_ID%in%areasWithPreferedDest)
-  }  
-
-  # Feasible cells
-  if(destLvl== 1) {
-    
-    
-    #feasibleArea <- feasibleArea %>% filter(nbhdQ)
-    
-    
+    # Selecting the best area based on the level     
+    newDestArea <- feasibleArea %>%
+      filter(area_catchment_potential == max(area_catchment_potential)) %>%
+      dplyr::select(NBHD_ID) %>% 
+      sample_n(size = 1) %>% 
+      as.character()
+    cellsInArea <- pxlsTemp %>% 
+      filter(NBHD_ID==newDestArea)
     }
+  if(destLvl==3){ cellsInArea <- pxlsTemp }
   
-  
-  
-  
-  if(destLvl== 2) 
-  if(destLvl== 3)
-  # echo("here3_1")
-  # selecting one from max catchments by random
-  # echo(length(feasibleNbhdsQuarters))
-
-  # echo("here3_2")
-  
-  if(destTypePref=="all"){
-    
-    # select 10 resid cells
-    pxlsTemp %>% 
-      filter(nbhdQ==newDestNbhd) %>% 
-      filter(type=="resid") %>% 
-      sample_n(10)
-    
+  # Select 10 cell centre matching the co-location preference
+  if(destPositionPref=="resid"){
+  sampleCells <- cellsInArea %>% 
+    filter(type=="resid") %>% 
+    sample_n(10) 
+  }else{ 
+    sampleCells <- cellsInArea %>% 
+      filter(type==destPositionPref) %>% 
+      sample_n(min(10,n())) 
   }
   
-  
+  # Selecting the best place for the dest within the area from a sample of 10
+  bestCatchment <- 0
+  #i <- 1
+  for(i in 1:nrow(sampleCells)){
+    x <- sampleCells[i,"pxl_x"]
+    y <- sampleCells[i,"pxl_y"]
+    # echo(paste(x,y))
+    
+    cellsWithinBB <- pxlsTemp %>% 
+      # Selecting cells within the bounding box
+    filter(pxl_x <= x+(0.8+destRadius) & pxl_x >= x-(0.8+destRadius) & 
+             pxl_y >= y-(0.8+destRadius) & pxl_y <= y+(0.8+destRadius)
+    )  
+    
+    # Select the closest ones for            
+    cellsWithinBB <- cellsWithinBB %>%            
+      mutate(dist = sqrt((pxl_x-x)^2 + (pxl_y-y)^2)) %>% 
+      arrange(dist)
+    
+    catchment20min <- cellsWithinBB %>% 
+      filter(dist>=destRadius & dist<=(0.8+destRadius) ) %>% 
+      summarise(catchment_potential = sum(.data[[paste0("not_served_by_", destCode)]])) %>% 
+      unlist()
 
-  
-  return(plxs4Dest$ID.1)
+    if(catchment20min > bestCatchment){
+      cellsSelected <- cellsWithinBB %>%  slice_head(n=cellsToOccupy)
+      bestCatchment <- catchment20min
+    }
+  }
+  return(cellsSelected$ID)
 }
