@@ -159,7 +159,10 @@ findDestinationCells <- function(pxlsTemp,destList,cellsToOccupy,
       unlist()
 
     if(catchment20min > bestCatchment){
-      cellsSelected <- cellsWithinBB %>%  slice_head(n=cellsToOccupy)
+      cellsSelected <- cellsWithinBB %>% 
+        filter(type==destPositionPref) %>% 
+        slice_head(n=cellsToOccupy)
+      
       bestCatchment <- catchment20min
     }
   }

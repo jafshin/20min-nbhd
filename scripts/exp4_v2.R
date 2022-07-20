@@ -91,17 +91,26 @@ optimise_nbhds <- function(dph) {
     mutate(nbhdQ=ifelse(test = pxl_x<nbhd_x & pxl_y>nbhd_y,
                         yes = paste0(NBHD_ID,"_4"), no=nbhdQ))  
   
-  avg_px_pop <- ceiling (pop / pxl_n) # Assuming homogeneous population distribution
+  # Calculating probability for cell population
+  px_pop_avg <- pop / pxl_n
+  px_pop_h <- ceiling(pop / pxl_n) 
+  px_pop_l <- floor(pop / pxl_n) 
+  prob_h <- (px_pop_avg-px_pop_l)/(px_pop_h-px_pop_l) # probability of population being the ceiling value 
+  prob_l <- (1-prob_h) # probability of population being the floor value
+  
   remaining_population <- pop 
   for (nb in nbhds$NBHD_ID) { # populating the pixles
     my_pixls <- which(pixls$NBHD_ID == nb)
     for (px in my_pixls){
-      pixls[px, "pxl_pop"] <- min(avg_px_pop, remaining_population)
+      rnd_number <- runif(1, 0, 1)
+      if(rnd_number<prob_h){
+        pixls[px, "pxl_pop"] <- min(prob_h, remaining_population)
+      }else{
+        pixls[px, "pxl_pop"] <- min(px_pop_l, remaining_population)
+      }
       remaining_population <- remaining_population - pixls$pxl_pop[px]
     }
   }
-  pixls <- pixls %>% filter(pxl_pop > 0) %>% # Just keeping the pixels with pop
-    mutate(type="resid", destID="NA")
 
   # Joining nbhds and pixels
   nbhds <- pixls %>%
