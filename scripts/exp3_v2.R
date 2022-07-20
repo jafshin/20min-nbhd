@@ -131,7 +131,8 @@ optimise_nbhds <- function(dph) {
     destCode <- destList$destCode[destRow] # getting the dest type
     destLvl <- destList$lvl[destRow] # getting the dest level
     cellsToOccupy <- max(1,round(destList$land_req[destRow]/pxl_a))
-    destRadius <- sqrt(destList$land_req[destRow]/pi)
+    if (destCode=="cc") cellsToOccupy <- 2 
+    destRadius <- max((pxl_d/2)+0.001,sqrt(destList$land_req[destRow]/pi))
     iter_dest_position <- destList$position[destRow] # getting the dest type
     
     # FIRST destination OF TYPE destRow is also going through the evolutionary process
@@ -372,7 +373,7 @@ optimise_nbhds <- function(dph) {
       destToUpdateType <- destsToUpdate[i,"type"]
       pxlsToMove <- destsToUpdate[i,"areaPxls"]
       destToUpdateLvl <- destList[which(destList[,"destCode"]==destToUpdateType),"lvl"]
-      destToUpdateRadius <- sqrt(destList[which(destList[,"destCode"]==destToUpdateType),"land_req"]/pi)
+      destToUpdateRadius <- max((pxl_d/2)+0.001,sqrt(destList[which(destList[,"destCode"]==destToUpdateType),"land_req"]/pi))
 
       origCells <- which(pxlsMutation$destID==destToUpdateID)
       # Find where to move

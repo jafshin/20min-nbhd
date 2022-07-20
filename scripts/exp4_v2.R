@@ -138,12 +138,13 @@ optimise_nbhds <- function(dph) {
   pxlsInitial <- pixls # assigning iter specific variable pixels
   No_Answer_flag <- FALSE # a flag for when no answer will be found
   echo("Looping over all destinations and allocating initial locations")
-  # destRow=1
+  # destRow=7
   for(destRow in 1:nrow(destList)){
     destCode <- destList$destCode[destRow] # getting the dest type
     destLvl <- destList$lvl[destRow] # getting the dest level
     cellsToOccupy <- max(1,round(destList$land_req[destRow]/pxl_a))
-    destRadius <- sqrt(destList$land_req[destRow]/pi)
+    if (destCode=="cc") cellsToOccupy <- 2 
+    destRadius <- max((pxl_d/2)+0.001,sqrt(destList$land_req[destRow]/pi))
     iter_dest_position <- destList$position[destRow] # getting the dest type
     
     echo(paste("destination:",destCode,"; dwelling denisty:",dph,sep=" "))
@@ -398,7 +399,7 @@ optimise_nbhds <- function(dph) {
       destToUpdateType <- destsToUpdate[i,"type"]
       pxlsToMove <- destsToUpdate[i,"areaPxls"]
       destToUpdateLvl <- destList[which(destList[,"destCode"]==destToUpdateType),"lvl"]
-      destToUpdateRadius <- sqrt(destList[which(destList[,"destCode"]==destToUpdateType),"land_req"]/pi)
+      destToUpdateRadius <- max((pxl_d/2)+0.001,sqrt(destList[which(destList[,"destCode"]==destToUpdateType),"land_req"]/pi))
       
       origCells <- which(pxlsMutation$destID==destToUpdateID)
     
