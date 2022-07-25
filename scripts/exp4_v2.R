@@ -44,9 +44,8 @@ optimise_nbhds <- function(dph) {
   echo(paste0("Dweling Density, ", dph))
   echo(paste0("***********,", "***********"))
   
-  #  Destinations
-  dests <- read.csv("../inputs/destinations_v8.csv") 
 
+  
   # Step 1 Creating decision grid -------------------------------------------
   echo("Starting step 1 - Creating decision grid")
   # Creating the neighbourhoods 
@@ -119,6 +118,14 @@ optimise_nbhds <- function(dph) {
     left_join(nbhds, by="NBHD_ID")  %>% 
     filter(pxls_pop>0)
   
+  #  Destinations
+  
+  dests <- read.csv("../inputs/destinations_v8.csv") 
+  
+  dests <- dests %>% 
+    mutate(areaInCells = max(1,round(land_req/pxl_a)) ) 
+  if (destCode=="cc") areaInCells <- 2 
+  
   # Sorting init dest based on pop_req*land_req
   # meaning starting from those big and high pop destinations
   dests <- dests %>%
@@ -151,8 +158,7 @@ optimise_nbhds <- function(dph) {
   for(destRow in 1:nrow(destList)){
     destCode <- destList$destCode[destRow] # getting the dest type
     destLvl <- destList$lvl[destRow] # getting the dest level
-    cellsToOccupy <- max(1,round(destList$land_req[destRow]/pxl_a))
-    if (destCode=="cc") cellsToOccupy <- 2 
+    cellsToOccupy <- destList$areaInCells[destRow]
     destRadius <- max((pxl_d/2)+0.001,sqrt(destList$land_req[destRow]/pi))
     iter_dest_position <- destList$position[destRow] # getting the dest type
     
@@ -406,7 +412,7 @@ optimise_nbhds <- function(dph) {
       
       destToUpdateID <- destsToUpdate[i,"destID"]
       destToUpdateType <- destsToUpdate[i,"type"]
-      pxlsToMove <- destsToUpdate[i,"areaPxls"]
+      pxlsToMove <- destList[which(destList[,"destCode"]==destToUpdateType),"areaInCells"]
       destToUpdateLvl <- destList[which(destList[,"destCode"]==destToUpdateType),"lvl"]
       destToUpdateRadius <- max((pxl_d/2)+0.001,sqrt(destList[which(destList[,"destCode"]==destToUpdateType),"land_req"]/pi))
       destToUpdatePosition <- destList[which(destList[,"destCode"]==destToUpdateType),"position"]

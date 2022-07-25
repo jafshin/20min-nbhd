@@ -42,13 +42,12 @@ optimise_nbhds <- function(dph) {
   echo(paste0("Total Population, ", pop))
   echo(paste0("Dweling Density, ", dph))
   echo(paste0("***********,", "***********"))
-  #  Destinations
-  dests <- read.csv("../inputs/destinations_v8.csv") 
-  # How many of each destination needed
-  dests <- dests %>% 
-    mutate(num_dests=ceiling(pop/dests$pop_req))
+  
+ 
+ 
 # Step 1 Creating decision grid -------------------------------------------
   echo("Step 1 starts - Creating decision grid")
+  
   # Creating the neighbourhoods 
   nbhd_dev_area <- nbhd_d^2 * share_land_for_resid # land for development per nbhd
   nbhd_n <- ceiling(pop * 0.01 / (dph * pphh * nbhd_dev_area)) # number of nbhds
@@ -57,26 +56,30 @@ optimise_nbhds <- function(dph) {
   nbhds <- nbhds %>% # Adding Land for destinations as a var to nbhds
     mutate(land_for_dest = nbhd_d^2 * share_land_for_dest) %>% 
     mutate(remaining_land_for_dest = land_for_dest)
+  
   # Creating pixels
   pxl_a <- pxl_d*pxl_d
   pxl_dev_a <- pxl_a * share_land_for_resid # area in each pixel for population (this is used for applying density)
   pxl_n <- ceiling(pop * 0.01 / (dph * pphh * pxl_dev_a))
   pixls <- make_pixels_df(pxl_d, pop, dph, 
                           pphh, study_area_d, nbhds) # creating pixles
+  
+  
   # Replace nbhd coordinates with its centroid X and Y
- 
-  #     mutate(position='all')  
-  # } nbhds_geom <- nbhds[,"NBHD_ID"]
+  
+  # nbhds_geom <- nbhds[,"NBHD_ID"]
   nbhds <- nbhds %>%
     mutate(nbhd_x=as.numeric(sf::st_coordinates(st_centroid(.))[,1]),
            nbhd_y=as.numeric(sf::st_coordinates(st_centroid(.))[,2]))%>% 
     st_drop_geometry()  
+  
   # Replace cell coordinates with its centroid X and Y
   pixls_geom <- pixls[,"ID"]
   pixls <- pixls %>% 
     mutate(pxl_x=as.numeric(sf::st_coordinates(st_centroid(.))[,1]),
            pxl_y=as.numeric(sf::st_coordinates(st_centroid(.))[,2]))%>% 
     st_drop_geometry()
+  
   # Add distance to nbhd centre to cells
   pixls <- pixls %>% 
     left_join(nbhds[,c("NBHD_ID","nbhd_x","nbhd_y")], by = c("NBHD_ID")) %>% 
@@ -119,10 +122,25 @@ optimise_nbhds <- function(dph) {
     summarise(pxls_pop = sum(pxl_pop)) %>%
     left_join(nbhds, by="NBHD_ID")  %>% 
     filter(pxls_pop>0)
+  
+  # Destinations
+  
+  dests <- read.csv("../inputs/destinations_v8.csv")
+  
+  # Adding area in terms of pixel to list
+  dests <- dests %>% 
+    mutate(areaInCells = max(1,round(land_req/pxl_a)) ) 
+  if (destCode=="cc") areaInCells <- 2 
+  
+  # How many of each destination needed
+  dests <- dests %>% 
+    mutate(num_dests=ceiling(pop/dests$pop_req))
+  
   # Sorting init dest based on pop_req*land_req
   # meaning starting from those big and high pop destinations
   dests <- dests %>%
     arrange(order,desc(land_req),desc(pop_req)) 
+  
   for(dest in dests$destCode){
     # Adding destinations to the pixels
     pixls <- pixls %>% 
@@ -131,6 +149,7 @@ optimise_nbhds <- function(dph) {
       mutate(!!paste0("pop_total_", dest):=0) %>% 
       mutate(!!paste0("pop_remaining_", dest):=0)
   }
+  
   echo("Finished Creating decision grid (Step 1)")
   # Step 2: Initial layout  -------------------------------------------------
   echo("Starting Creating initial layout (Step 2)")
@@ -147,8 +166,7 @@ optimise_nbhds <- function(dph) {
   for(destRow in 1:nrow(destList)){
     destCode <- destList$destCode[destRow] # getting the dest type
     destLvl <- destList$lvl[destRow] # getting the dest level
-    cellsToOccupy <- max(1,round(destList$land_req[destRow]/pxl_a))
-    if (destCode=="cc") cellsToOccupy <- 2 
+    cellsToOccupy <- destList$areaInCells[destRow]
     destRadius <- max((pxl_d/2)+0.001,sqrt(destList$land_req[destRow]/pi))
     iter_dest_position <- destList$position[destRow] # getting the dest type
     
@@ -388,7 +406,7 @@ optimise_nbhds <- function(dph) {
       
       destToUpdateID <- destsToUpdate[i,"destID"]
       destToUpdateType <- destsToUpdate[i,"type"]
-      pxlsToMove <- destsToUpdate[i,"areaPxls"]
+      pxlsToMove <- destList[which(destList[,"destCode"]==destToUpdateType),"areaInCells"]
       destToUpdateLvl <- destList[which(destList[,"destCode"]==destToUpdateType),"lvl"]
       destToUpdatePosition <- destList[which(destList[,"destCode"]==destToUpdateType),"position"]
       destToUpdateRadius <- max((pxl_d/2)+0.001,sqrt(destList[which(destList[,"destCode"]==destToUpdateType),"land_req"]/pi))
