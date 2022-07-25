@@ -409,6 +409,7 @@ optimise_nbhds <- function(dph) {
       pxlsToMove <- destsToUpdate[i,"areaPxls"]
       destToUpdateLvl <- destList[which(destList[,"destCode"]==destToUpdateType),"lvl"]
       destToUpdateRadius <- max((pxl_d/2)+0.001,sqrt(destList[which(destList[,"destCode"]==destToUpdateType),"land_req"]/pi))
+      destToUpdatePosition <- destList[which(destList[,"destCode"]==destToUpdateType),"position"]
       
       origCells <- which(pxlsMutation$destID==destToUpdateID)
     
@@ -443,8 +444,12 @@ optimise_nbhds <- function(dph) {
       pxlsMutation[destCellsRow,reminderPopCol] <- capacityToAdd
       pxlsMutation[destCellsRow,numDestCol] <- 1
       # Adding population to the previously dests
-      pxlsMutation[origCells,"type"] <- "resid"
+      
+      
+      pxlsMutation[origCells,"type"] <- destToUpdatePosition # Setting orig cells to their parent type
+      
       pxlsMutation[origCells,"destID"] <- "NA"
+      
       pxlsMutation[origCells, "pxl_pop"] <- floor(popToMove/length(origCells)) # using floor to not to add extra
       extraPop <- popToMove%%length(origCells) # get the reminder from the flow
       pxlsMutation[origCells[1:extraPop],"pxl_pop"]<-pxlsMutation[origCells[1:extraPop],

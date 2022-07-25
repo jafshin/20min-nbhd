@@ -5,6 +5,8 @@
 #
 # @author AJ
 
+# TODO, fix the issue with co-located destination mutation 
+
 # Packages ----------------------------------------------------------------
 library(rdist)
 library(dplyr)
@@ -45,7 +47,7 @@ optimise_nbhds <- function(dph) {
   # How many of each destination needed
   dests <- dests %>% 
     mutate(num_dests=ceiling(pop/dests$pop_req))
-# Step 1 Creating decision grid -------------------------------------------\
+# Step 1 Creating decision grid -------------------------------------------
   echo("Step 1 starts - Creating decision grid")
   # Creating the neighbourhoods 
   nbhd_dev_area <- nbhd_d^2 * share_land_for_resid # land for development per nbhd
@@ -107,6 +109,7 @@ optimise_nbhds <- function(dph) {
         remaining_population <- remaining_population - pixls$pxl_pop[px]
     }
   }
+  
   pixls <- pixls %>% filter(pxl_pop > 0) %>% # Just keeping the pixels with pop
     mutate(type="resid", destID="NA")
 
@@ -387,6 +390,7 @@ optimise_nbhds <- function(dph) {
       destToUpdateType <- destsToUpdate[i,"type"]
       pxlsToMove <- destsToUpdate[i,"areaPxls"]
       destToUpdateLvl <- destList[which(destList[,"destCode"]==destToUpdateType),"lvl"]
+      destToUpdatePosition <- destList[which(destList[,"destCode"]==destToUpdateType),"position"]
       destToUpdateRadius <- max((pxl_d/2)+0.001,sqrt(destList[which(destList[,"destCode"]==destToUpdateType),"land_req"]/pi))
 
       origCells <- which(pxlsMutation$destID==destToUpdateID)
@@ -422,8 +426,11 @@ optimise_nbhds <- function(dph) {
       pxlsMutation[destCellsRow,reminderPopCol] <- capacityToAdd
       pxlsMutation[destCellsRow,numDestCol] <- 1
       # Adding population to the previously dests
-      pxlsMutation[origCells,"type"] <- "resid"
-      pxlsMutation[origCells,"destID"] <- "NA"
+      
+      pxlsMutation[origCells,"type"] <- destToUpdatePosition # Setting orig cells to their parent type
+      
+      pxlsMutation[origCells,"destID"] <- "NA" # TODO save the orig dest ID
+      
       pxlsMutation[origCells, "pxl_pop"] <- floor(popToMove/length(origCells)) # using floor to not to add extra
       extraPop <- popToMove%%length(origCells) # get the reminder from the flow
       pxlsMutation[origCells[1:extraPop],"pxl_pop"]<-pxlsMutation[origCells[1:extraPop],
