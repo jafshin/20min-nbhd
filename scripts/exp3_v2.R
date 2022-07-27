@@ -18,580 +18,370 @@ library(readr)
 library(stringr)
 
 # Functions ---------------------------------------------------------------
-source("./functions/initation_functions.R")
 source("./functions/land_updating.R")
-source("./functions/visualisation.R")
-source("./functions/make_pixels_df.R")
-source("./functions/distribute_population.R")
-source("./functions/make_nbhds.R")
-source("./functions/make_locations.R")
+source("./functions/update_service.R")
+source("./functions/scoring.R")
+source("./functions/make-layout.R")
 
 echo<- function(msg) {
   cat(paste0(as.character(Sys.time()), ' | ', msg,"\n"))  
 } 
-# dph <- 15
+# dph <- 25
 optimise_nbhds <- function(dph) {
 # Step 0: Setting up inputs and structure ---------------------------------
   echo(paste0("******************* DWELLING DENSITY: ", dph))
   output_sub_dir <-  paste0(output_dir, "Density_", dph, "/") # one sub-dir for each density
-  #print(output_sub_dir)
   ifelse(!dir.exists(output_sub_dir), dir.create(output_sub_dir), FALSE) # create if not exists
   log_file <- paste0(output_sub_dir, "output_log_D", dph, ".txt")  # log file for keeping the record
-  sink(log_file, append=FALSE, split=TRUE) # sink to both console and log file
+  sink(log_file, append = FALSE, split = TRUE) # sink to both console and log file
   output_file <- paste0(output_sub_dir, "output_decision_D", dph, ".csv") # decision file indicating where final destination will be located
-  echo(paste0("Total Population, ", pop))
+  echo(paste0("Total Population, ", total_population))
   echo(paste0("Dweling Density, ", dph))
   echo(paste0("***********,", "***********"))
-  
- 
- 
+
 # Step 1 Creating decision grid -------------------------------------------
   echo("Step 1 starts - Creating decision grid")
   
-  # Creating the neighbourhoods 
-  nbhd_dev_area <- nbhd_d^2 * share_land_for_resid # land for development per nbhd
-  nbhd_n <- ceiling(pop * 0.01 / (dph * pphh * nbhd_dev_area)) # number of nbhds
-  nbhds <- make_nbhds(nbhd_d, nbhd_n) # nbhds with geometries
-  study_area_d <- nbhd_d * (ceiling(sqrt(nbhd_n))+1) # Dimensions of the study area
-  nbhds <- nbhds %>% # Adding Land for destinations as a var to nbhds
-    mutate(land_for_dest = nbhd_d^2 * share_land_for_dest) %>% 
-    mutate(remaining_land_for_dest = land_for_dest)
-  
-  # Creating pixels
+  cells <- suppressWarnings(make_layout(nbhd_d, share_land_for_resid, 
+                       total_population, dph, pphh, pxl_d))
   pxl_a <- pxl_d*pxl_d
-  pxl_dev_a <- pxl_a * share_land_for_resid # area in each pixel for population (this is used for applying density)
-  pxl_n <- ceiling(pop * 0.01 / (dph * pphh * pxl_dev_a))
-  pixls <- make_pixels_df(pxl_d, pop, dph, 
-                          pphh, study_area_d, nbhds) # creating pixles
-  
-  
-  # Replace nbhd coordinates with its centroid X and Y
-  
-  # nbhds_geom <- nbhds[,"NBHD_ID"]
-  nbhds <- nbhds %>%
-    mutate(nbhd_x=as.numeric(sf::st_coordinates(st_centroid(.))[,1]),
-           nbhd_y=as.numeric(sf::st_coordinates(st_centroid(.))[,2]))%>% 
-    st_drop_geometry()  
-  
-  # Replace cell coordinates with its centroid X and Y
-  pixls_geom <- pixls[,"ID"]
-  pixls <- pixls %>% 
-    mutate(pxl_x=as.numeric(sf::st_coordinates(st_centroid(.))[,1]),
-           pxl_y=as.numeric(sf::st_coordinates(st_centroid(.))[,2]))%>% 
-    st_drop_geometry()
-  
-  # Add distance to nbhd centre to cells
-  pixls <- pixls %>% 
-    left_join(nbhds[,c("NBHD_ID","nbhd_x","nbhd_y")], by = c("NBHD_ID")) %>% 
-    mutate(dist2ltc = sqrt((pxl_x-nbhd_x)^2 + (pxl_y-nbhd_y)^2 )) %>% 
-    mutate(nbhdQ=paste0(NBHD_ID,"_1")) %>% 
-    mutate(nbhdQ=ifelse(test = pxl_x>nbhd_x & pxl_y<nbhd_y, 
-                        yes = paste0(NBHD_ID,"_2"), no=nbhdQ)) %>% 
-    mutate(nbhdQ=ifelse(test = pxl_x<nbhd_x & pxl_y<nbhd_y, 
-                        yes = paste0(NBHD_ID,"_3"), no=nbhdQ)) %>% 
-    mutate(nbhdQ=ifelse(test = pxl_x<nbhd_x & pxl_y>nbhd_y,
-                        yes = paste0(NBHD_ID,"_4"), no=nbhdQ))  
-  
-  # Calculating probability for cell population
-  px_pop_avg <- pop / pxl_n
-  px_pop_h <- ceiling(pop / pxl_n) 
-  px_pop_l <- floor(pop / pxl_n) 
-  prob_h <- (px_pop_avg-px_pop_l)/(px_pop_h-px_pop_l) # probability of population being the ceiling value 
-  prob_l <- (1-prob_h) # probability of population being the floor value
-  
-  remaining_population <- pop 
-  for (nb in nbhds$NBHD_ID) { # populating the pixles
-    my_pixls <- which(pixls$NBHD_ID == nb)
-    for (px in my_pixls){
-      rnd_number <- runif(1, 0, 1)
-      if(rnd_number<prob_h){
-        pixls[px, "pxl_pop"] <- min(prob_h, remaining_population)
-      }else{
-        pixls[px, "pxl_pop"] <- min(px_pop_l, remaining_population)
-        }
-        remaining_population <- remaining_population - pixls$pxl_pop[px]
-    }
-  }
-  
-  pixls <- pixls %>% filter(pxl_pop > 0) %>% # Just keeping the pixels with pop
-    mutate(type="resid", destID="NA")
-
-  # Joining nbhds and pixels
-  nbhds <- pixls %>%
-    group_by(NBHD_ID) %>%
-    summarise(pxls_pop = sum(pxl_pop)) %>%
-    left_join(nbhds, by="NBHD_ID")  %>% 
-    filter(pxls_pop>0)
-  
-  # Destinations
-  
-  dests <- read.csv("../inputs/destinations_v8.csv")
-  
   # Adding area in terms of pixel to list
   dests <- dests %>% 
-    mutate(areaInCells = max(1,round(land_req/pxl_a)) ) 
-  if (destCode=="cc") areaInCells <- 2 
+    rowwise() %>% 
+    mutate(area_in_cells = ifelse(test = dest_code == "cc",
+                                  yes  = 2, 
+                                  no   = max(1, round(land_req / pxl_a)))) %>%
+    ungroup()
   
   # How many of each destination needed
   dests <- dests %>% 
-    mutate(num_dests=ceiling(pop/dests$pop_req))
+    mutate(num_dests = ceiling(total_population / pop_req))
   
   # Sorting init dest based on pop_req*land_req
   # meaning starting from those big and high pop destinations
   dests <- dests %>%
-    arrange(order,desc(land_req),desc(pop_req)) 
+    arrange(order, desc(land_req), desc(pop_req)) 
   
-  for(dest in dests$destCode){
+  for(dest in dests$dest_code){
     # Adding destinations to the pixels
-    pixls <- pixls %>% 
-      mutate(!!paste0("not_served_by_",dest):=pxl_pop) %>% 
-      mutate(!!paste0("num_dest_", dest):=0) %>% 
-      mutate(!!paste0("pop_total_", dest):=0) %>% 
-      mutate(!!paste0("pop_remaining_", dest):=0)
+    cells <- cells %>% 
+      mutate(!!paste0("not_served_by_", dest) := pxl_pop) %>% 
+      mutate(!!paste0("num_dest_",      dest) := 0) %>% 
+      mutate(!!paste0("pop_total_",     dest) := 0) %>% 
+      mutate(!!paste0("pop_remaining_", dest) := 0)
   }
   
   echo("Finished Creating decision grid (Step 1)")
+  
   # Step 2: Initial layout  -------------------------------------------------
+  
   echo("Starting Creating initial layout (Step 2)")
-  nbhdsTemp <- nbhds # assigning iter specific variable nbhds
-  destList <- dests # assigning iter specific variable destinations
-  pxlsInitial <- pixls # assigning iter specific variable pixels
+  dest_list <- dests # assigning iter specific variable destinations
+  cells_initial <- cells # assigning iter specific variable pixels
   No_Answer_flag <- FALSE # a flag for when no answer will be found
   clstsId <- 1
   
   # Loop over all destinations
-  # destRow=1
   echo("Looping over all destinations and allocating initial locations")
-  
-  for(destRow in 1:nrow(destList)){
-    destCode <- destList$destCode[destRow] # getting the dest type
-    destLvl <- destList$lvl[destRow] # getting the dest level
-    cellsToOccupy <- destList$areaInCells[destRow]
-    destRadius <- max((pxl_d/2)+0.001,sqrt(destList$land_req[destRow]/pi))
-    iter_dest_position <- destList$position[destRow] # getting the dest type
+  # dest_row=1
+  for(dest_row in 1:nrow(dest_list)){
+    dest_code <- dest_list$dest_code[dest_row] # getting the dest type
+    dest_lvl <- dest_list$lvl[dest_row] # getting the dest level
+    cells_to_occupy <- dest_list$area_in_cells[dest_row]
+    dest_r <- max((pxl_d / 2) + 0.001, sqrt(dest_list$land_req[dest_row] / pi))
+    iter_dest_position <- dest_list$position[dest_row] # getting the dest type
     
-    # FIRST destination OF TYPE destRow is also going through the evolutionary process
-    echo(paste("destination:",destCode,"; dwelling denisty:",dph,sep=" "))
+    # FIRST destination OF TYPE dest_row is also going through the evolutionary process
+    echo(paste("destination:",dest_code,"; dwelling denisty:",dph,sep=" "))
     
     error_counter <- 0
-    remaining_num_dests <- destList$num_dests[destRow]
+    remaining_num_dests <- dest_list$num_dests[dest_row]
     # Repeating the process until all neighborhoods are served
-    while((remaining_num_dests > 0) & (get_unsrvd_pop(pxlsInitial,destCode) > pop*(1-destList$coverage[destRow]))){ # loop until we have destinations to use
+    while((remaining_num_dests > 0) & 
+          (get_unsrvd_pop(cells_initial,dest_code) > total_population *
+           (1 - dest_list$coverage[dest_row]))){ # loop until we have destinations to use
       # CREATING A LIST OF DIFFERENT LOCATIONS AND THEIR POTENTIAL CATCHMENTS
 
       system.time(
-        destCellsID <- findDestinationCells(pxlsInitial,destList,cellsToOccupy,
-                                            destCode,pxl_a,destLvl,destRadius))
-      destCellsRow <- which(pxlsInitial$ID%in%destCellsID)
-      if(length(destCellsID)==0){ 
+        dest_cells_id <- findDestinationCells(cells_initial, dest_list, 
+                                              cells_to_occupy, 
+                                              dest_code, pxl_a, 
+                                              dest_lvl,dest_r))
+      
+      dest_cells_row <- which(cells_initial$id %in% dest_cells_id)
+      
+      if(length(dest_cells_id) == 0){ 
         echo("No Answer")
         No_Answer_flag <- TRUE
         break();
       }
       # Add destination to the the cell
-      pxlsInitial$type[destCellsRow] <- destCode
+      cells_initial$type[dest_cells_row] <- dest_code
       remaining_num_dests <- remaining_num_dests - 1
-      pxlsInitial$destID[destCellsRow] <- paste0(destCode,"_",
-                                             destList$num_dests[destRow]-remaining_num_dests)
+      cells_initial$dest_id[dest_cells_row] <- paste0(dest_code,"_",
+                                             dest_list$num_dests[dest_row] - remaining_num_dests)
       # Adding new capacity
-      reminderPopCol <- paste0("pop_remaining_",destCode)
-      totalPopCol <- paste0("pop_total_",destCode)
-      numDestCol <- paste0("num_dest_",destCode)
-      unsrvdPopCol <- paste0("not_served_by_",destCode)
+      reminderPopCol <- paste0("pop_remaining_",dest_code)
+      totalPopCol <- paste0("pop_total_",dest_code)
+      numDestCol <- paste0("num_dest_",dest_code)
+      unserved_pop_col <- paste0("not_served_by_",dest_code)
       
-      pxlsInitial[destCellsRow,totalPopCol] <- destList[destRow,"capacity"]
-      pxlsInitial[destCellsRow,reminderPopCol] <- destList[destRow,"capacity"]
-      pxlsInitial[destCellsRow,numDestCol] <- 1
+      cells_initial[dest_cells_row,totalPopCol] <- dest_list[dest_row,"capacity"]
+      cells_initial[dest_cells_row,reminderPopCol] <- dest_list[dest_row,"capacity"]
+      cells_initial[dest_cells_row,numDestCol] <- 1
       # Start serving people around
-      destGeom <- pxlsInitial %>% 
-        filter(ID%in%destCellsID) %>% 
-        st_as_sf(coords=c("pxl_x","pxl_y"), remove=F) %>% 
+      dest_geom <- cells_initial %>% 
+        filter(id %in% dest_cells_id) %>% 
+        st_as_sf(coords=c("pxl_x", "pxl_y"), remove=F) %>% 
         st_union() %>% 
         st_convex_hull() 
       
       # Getting those within 20 min access    
-      cellsWithinDistRow <- destGeom %>% 
+      cellsWithinDistRow <- dest_geom %>% 
         st_buffer(0.8) %>% 
-        st_intersects(pxlsInitial %>% st_as_sf(coords=c("pxl_x","pxl_y"), remove=F)) 
+        st_intersects(cells_initial %>% st_as_sf(coords=c("pxl_x", "pxl_y"), 
+                                                 remove=F)) 
       
-      cellsWithinDistID <- pxlsInitial[unlist(cellsWithinDistRow),] %>% 
-        st_as_sf(coords=c("pxl_x","pxl_y"), remove=F) %>% 
-        dplyr::mutate(dist2Dest=st_distance(.,destGeom)) %>% 
+      cells_within_dist_id <- cells_initial[unlist(cellsWithinDistRow), ] %>% 
+        st_as_sf(coords = c("pxl_x", "pxl_y"), remove=F) %>% 
+        dplyr::mutate(dist_to_dest = st_distance(., dest_geom)) %>% 
         st_drop_geometry() %>% 
-        arrange(dist2Dest) %>%
-        dplyr::select(ID)
+        arrange(dist_to_dest) %>%
+        dplyr::select(id)
    
-      if(!nrow(cellsWithinDistID) > 0) message("**Something is not right**")
-      if(!nrow(cellsWithinDistID) > 0) stop()
+      if(!nrow(cells_within_dist_id) > 0) message("**Something is not right**")
+      if(!nrow(cells_within_dist_id) > 0) stop()
       # Serving cells 
       system.time({
-        remainingCap <- pxlsInitial[destCellsRow,reminderPopCol][1]
-        closeCells <- pxlsInitial[which(pxlsInitial$ID %in% cellsWithinDistID$ID),]
+        remaining_capacity <- cells_initial[dest_cells_row, reminderPopCol][1]
+        close_cells <- cells_initial[which(
+          cells_initial$id %in% cells_within_dist_id$id), ]
         cell <- 1
-        for(cell in 1:nrow(closeCells)) {
-          # cellRow <- which(pxlsInitial$ID==id)
-          cellUnsrvedPop <-  closeCells[cell,unsrvdPopCol]
-          if (remainingCap > 0 & cellUnsrvedPop > 0){
-            pop2cover <- min(remainingCap,cellUnsrvedPop) # finding population to cover
+        for(cell in 1:nrow(close_cells)) {
+          # cellRow <- which(cells_initial$id==id)
+          cell_unsrved_pop <-  close_cells[cell, unserved_pop_col]
+          if (remaining_capacity > 0 & cell_unsrved_pop > 0){
+            pop2cover <- min(remaining_capacity, cell_unsrved_pop) # finding population to cover
             # Updating the capapcity
-            remainingCap <- remainingCap-pop2cover
+            remaining_capacity <- remaining_capacity-pop2cover
             # Updating unserved pop
-            closeCells[cell,unsrvdPopCol] <- cellUnsrvedPop - pop2cover
+            close_cells[cell,unserved_pop_col] <- cell_unsrved_pop - pop2cover
           }
         }
-        pxlsInitial[which(pxlsInitial$ID %in% cellsWithinDistID$ID),] <- closeCells
-        pxlsInitial[destCellsRow,reminderPopCol] <- remainingCap
+        cells_initial[which(
+          cells_initial$id %in% cells_within_dist_id$id), ] <- close_cells
+        cells_initial[dest_cells_row, reminderPopCol] <- remaining_capacity
       })
     }
   }
-  pxlsInitial %>% 
+  cells_initial %>% 
     st_as_sf(coords=c("pxl_x","pxl_y"), remove=F) %>% 
-    st_write(outputSqlite, layer = paste0(dph,"_step2"), delete_layer=T)
+    st_write(output_sqlite, layer = paste0(dph,"_step2"), delete_layer=T)
+    
   # In this step, population from pixels occupied with dests will be removed
   # And will be uniformly distributed in other locations
   # We will use random samples in order to redistribute
   echo("Finished Creating initial layout (Step 2)")
+
+  # Step 3: Updating demand distribution ------------------------------------
   
-# Step 3: Updating demand distribution ------------------------------------
   echo("Starting Updating demand distribution (step3)")
   
-  homelessPop <- pxlsInitial %>%
-    filter(type!="resid") %>% 
-    summarise(homelessPop = sum(pxl_pop)) %>% 
-    unlist()
-  # echo("here1-1")
-  hostPxls <- pxlsInitial %>% 
-    filter(type=="resid") %>% 
-    filter(pxl_pop>0) %>% 
-    dplyr::select(ID) %>%
-    slice_sample(n=homelessPop,replace=T)
-  # echo("here1-2")
-  popServCols <- grep("not_",colnames(pxlsInitial))
-  nonResids <- which(pxlsInitial$type!="resid" & pxlsInitial$pxl_pop>0)
-  pxlsInitial[nonResids,"pxl_pop"] <- 0
-  pxlsInitial[nonResids,popServCols] <- 0
-  #i=3963
-  for (i in 1:nrow(pxlsInitial)) {
-    if(pxlsInitial[i,"ID"]%in%hostPxls$ID){
-      pxlsInitial[i,"incomingPop"]=length(hostPxls[hostPxls==pxlsInitial[i,"ID"]])
-      pxlsInitial[i,"pxl_pop"]=pxlsInitial[i,"pxl_pop"]+pxlsInitial[i,"incomingPop"]
-      pxlsInitial[i,popServCols]=pxlsInitial[i,popServCols]+pxlsInitial[i,"incomingPop"]
-    }
-    else{
-      pxlsInitial[i,"incomingPop"]=0
-    }
-  }
-  pxlsInitial %>% 
+  cells_initial_relocated <-move_homeless(cells_initial) 
+ 
+  system.time({
+    cells_initial_updated <- update_service_all(cells_initial_relocated, 
+                                                dest_list)
+  })
+  
+  cells_initial_updated %>% 
     st_as_sf(coords=c("pxl_x","pxl_y"), remove=F) %>% 
-    st_write(outputSqlite, layer = paste0(dph,"_step3"), delete_layer=T)
+    st_write(output_sqlite, layer = paste0(dph,"_step3"), delete_layer=T)
   
-  # Update the service -----------------------
-  destsToUpdate <- pxlsInitial %>% 
-    filter(type!="resid") %>% 
-    group_by(type) %>% 
-    summarise(areaPxls=n()) %>% 
-    ungroup() %>% 
-    as.data.frame()
+  # cells_initial_updated  <- st_read(output_sqlite, layer = paste0(dph,"_step3"))
   
-  for (i in 1:nrow(destsToUpdate)){
-    destToUpdateType <- destsToUpdate[i,"type"]
-  
-    # Setting col names
-    totalPopCol <- paste0("pop_total_",destToUpdateType)
-    reminderPopCol <- paste0("pop_remaining_",destToUpdateType)      
-    unsrvdPopCol <- paste0("not_served_by_",destToUpdateType)
-    numDestCol <- paste0("num_dest_",destToUpdateType)
-    destListRow <- which(destList$destCode==destToUpdateType)
-    
-    # Un-serving all those for destToUpdateType
-    residRowIds <- which(pxlsInitial$type=="resid")
-    pxlsInitial[residRowIds,unsrvdPopCol] <- pxlsInitial[residRowIds,"pxl_pop"]
-    
-    # Returning all dests of this type to full cap
-    destCapacity <- destList[destListRow,"capacity"]
-    destTypeCellRows <- which(pxlsInitial$type==destToUpdateType)
-    pxlsInitial[destTypeCellRows,totalPopCol] <- destCapacity
-    pxlsInitial[destTypeCellRows,reminderPopCol] <- destCapacity
-    
-    # Iterating over all destinations of type destToUpdateType
-    destTypeIDs <- pxlsInitial%>%filter(type==destToUpdateType)%>%distinct(destID) 
-    # dest <- destTypeIDs$destID[1]
-    echo(paste0("Revisiting service provided by: ",destToUpdateType," family"))
-    for(dest in destTypeIDs$destID){
-      destCellsRow <- which(pxlsInitial$destID==dest)
-      destCellsID <- pxlsInitial[which(pxlsInitial$destID==dest),"ID"]
-      
-      # Start serving people around
-      destGeom <- pxlsInitial %>% 
-        filter(ID%in%destCellsID) %>% 
-        st_as_sf(coords=c("pxl_x","pxl_y"), remove=F) %>% 
-        st_union() %>% 
-        st_convex_hull() 
-      
-      # Getting those within 20 min access    
-      cellsWithinDistRow <- destGeom %>% 
-        st_buffer(0.8) %>% 
-        st_intersects(st_as_sf(pxlsInitial,coords=c("pxl_x","pxl_y"), remove=F)) 
-      
-      cellsWithinDistID <- pxlsInitial[unlist(cellsWithinDistRow),] %>% 
-        st_as_sf(coords=c("pxl_x","pxl_y"), remove=F) %>% 
-        dplyr::mutate(dist2Dest=st_distance(.,destGeom)) %>% 
-        st_drop_geometry() %>% 
-        arrange(dist2Dest) %>%
-        dplyr::select(ID)
-      
-      if(!nrow(cellsWithinDistID) > 0) echo("**Something is not right**")
-      # Serving cells 
-      system.time({
-        remainingCap <- pxlsInitial[destCellsRow,reminderPopCol][1]
-        closeCells <- pxlsInitial[which(pxlsInitial$ID %in% cellsWithinDistID$ID),]
-        # cell <- 1
-        for(cell in 1:nrow(closeCells)) {
-          # cellRow <- which(pxlsInitial$ID==id)
-          cellUnsrvedPop <-  closeCells[cell,unsrvdPopCol]
-          if (remainingCap > 0 & cellUnsrvedPop > 0){
-            pop2cover <- min(remainingCap,cellUnsrvedPop) # finding population to cover
-            # Updating the capapcity
-            remainingCap <- remainingCap-pop2cover
-            # Updating unserved pop
-            closeCells[cell,unsrvdPopCol] <- cellUnsrvedPop - pop2cover
-          }
-        }
-        pxlsInitial[which(pxlsInitial$ID %in% cellsWithinDistID$ID),] <- closeCells
-        pxlsInitial[destCellsRow,reminderPopCol] <- remainingCap
-        
-      })
-    }
-  }
   echo("Finished Updating demand distribution (step3)")
+  
   # Step 4: Scoring ---------------------------------------------------------
+  
   echo("Starting Scoring (step4)")
   
   if(No_Answer_flag){  
-    scoreTemp <- nrow(dests)*(200)
+    score_temp <- nrow(dests) * 200
   }else{
-    source("./functions/scoring.R")
-    scoreTemp <- getScore(pxlsInitial, destList) 
-    pxlsBest <- pxlsInitial
-    scoreBest <- scoreTemp
+    score_temp <- getScore(cells_initial_updated, dest_list) 
+    cells_best <- cells_initial_updated
+    score_best <- score_temp
   }
+  echo(paste0("Initial layout score: ", score_best))
+
   echo("Finished Scoring (step4)")
-  
-  echo(paste0("Initial layout score: ", scoreBest))
   
 # Step5: Mutating Supply --------------------------------------------------
   echo("Starting Mutating Supply (step 5)")
   
 ### Here is where the While loop should start
-  pxlsTemp <- pxlsInitial
+  cells_temp <- cells_initial_updated
   iter <- 1
-  convergenceCounter <- 0
+  convergence_counter <- 0
   while(iter < iters_max + 1){
     echo(paste0("Starting iteration: ", iter))
     
     # Select some dests to mutate:
-    destsToUpdate <- pxlsTemp %>% 
-      filter(destID!="NA") %>%  
-      group_by(destID,type) %>% 
+    dests_to_update <- cells_temp %>% 
+      filter(dest_id!="NA") %>%  
+      group_by(dest_id,type) %>% 
       summarise(areaPxls=n()) %>% 
       ungroup() %>% 
       slice_sample(prop=mutation_p) %>% 
       as.data.frame()
-    if(nrow(destsToUpdate)==0) echo("Mutation skipped")
-    if(nrow(destsToUpdate)!=0){
+    
+    if(nrow(dests_to_update) == 0) echo("Mutation skipped")
+    if(nrow(dests_to_update) != 0){
     # Changing the locations with free cells
-    pxlsMutation <- pxlsTemp
+    cells_mutation <- cells_temp
     # i=12
-    for (i in 1:nrow(destsToUpdate)){
+    for (i in 1:nrow(dests_to_update)){
       
-      destToUpdateID <- destsToUpdate[i,"destID"]
-      destToUpdateType <- destsToUpdate[i,"type"]
-      pxlsToMove <- destList[which(destList[,"destCode"]==destToUpdateType),"areaInCells"]
-      destToUpdateLvl <- destList[which(destList[,"destCode"]==destToUpdateType),"lvl"]
-      destToUpdatePosition <- destList[which(destList[,"destCode"]==destToUpdateType),"position"]
-      destToUpdateRadius <- max((pxl_d/2)+0.001,sqrt(destList[which(destList[,"destCode"]==destToUpdateType),"land_req"]/pi))
+      dest_to_update_id <- dests_to_update[i,"dest_id"]
+      dest_to_update_type <- dests_to_update[i,"type"]
+      cells_to_move <- unlist(dest_list[which(
+        dest_list[,"dest_code"] == dest_to_update_type), "area_in_cells"])
+      dest_to_update_lvl <- unlist(dest_list[which(
+        dest_list[,"dest_code"] == dest_to_update_type),"lvl"])
+      dest_to_update_position <- unlist(dest_list[which(
+        dest_list[,"dest_code"] == dest_to_update_type),"position"])
+      dest_to_update_radius <- max(( pxl_d / 2 ) + 0.001 , unlist(sqrt(
+        dest_list[which(dest_list[, "dest_code"] == dest_to_update_type), 
+                  "land_req"] / pi)))
 
-      origCells <- which(pxlsMutation$destID==destToUpdateID)
+      origin_cells <- which(cells_mutation$dest_id == dest_to_update_id)
+      
       # Find where to move
-      system.time(destCellsID <- findDestinationCells(pxlsMutation,destList,pxlsToMove,
-                                                      destToUpdateType,pxl_a,
-                                                      destToUpdateLvl,
-                                                      destToUpdateRadius))
-      if(length(destCellsID)==0){
+      dest_cells_id <- findDestinationCells(cells_mutation, 
+                                            dest_list,
+                                            cells_to_move,
+                                            dest_to_update_type,
+                                            pxl_a,
+                                            dest_to_update_lvl,
+                                            dest_to_update_radius)
+      
+      if(length(dest_cells_id) == 0){
         echo("No Answer")
         No_Answer_flag <- TRUE
         break();}
-      destCellsRow <- which(pxlsMutation$ID%in%destCellsID)
-      # Get population to move
-      popToMove <- pxlsMutation %>% 
-        filter(ID%in%destCellsRow) %>% 
-        summarise(total=sum(pxl_pop)) %>% 
-        as.numeric()
       
-      # Setting col names
-      totalPopCol <- paste0("pop_total_",destToUpdateType)
-      reminderPopCol <- paste0("pop_remaining_",destToUpdateType)      
-      unsrvdPopCol <- paste0("not_served_by_",destToUpdateType)
-      numDestCol <- paste0("num_dest_",destToUpdateType)
-      destListRow <- which(destList$destCode==destToUpdateType)
-
-      # Adding destinations to the previously resids
-      pxlsMutation[destCellsRow,"type"] <- destToUpdateType
-      pxlsMutation[destCellsRow,"destID"] <- destToUpdateID
-      pxlsMutation[destCellsRow, "pxl_pop"] <- 0 # not resid anymore
-      capacityToAdd <- destList[destListRow,"capacity"]
-      pxlsMutation[destCellsRow,totalPopCol] <- capacityToAdd
-      pxlsMutation[destCellsRow,reminderPopCol] <- capacityToAdd
-      pxlsMutation[destCellsRow,numDestCol] <- 1
-      # Adding population to the previously dests
+      dest_cells_row <- which(cells_mutation$id %in% dest_cells_id)
       
-      pxlsMutation[origCells,"type"] <- destToUpdatePosition # Setting orig cells to their parent type
-      
-      pxlsMutation[origCells,"destID"] <- "NA" # TODO save the orig dest ID
-      
-      pxlsMutation[origCells, "pxl_pop"] <- floor(popToMove/length(origCells)) # using floor to not to add extra
-      extraPop <- popToMove%%length(origCells) # get the reminder from the flow
-      pxlsMutation[origCells[1:extraPop],"pxl_pop"]<-pxlsMutation[origCells[1:extraPop],
-                                                              "pxl_pop"] +1  
-      pxlsMutation[origCells, totalPopCol] <- 0
-      pxlsMutation[origCells,reminderPopCol] <- 0
-      pxlsMutation[destCellsRow, numDestCol] <- 0
+      # Moving destination from origin_cells to dest_cells_row
+      cells_mutation <- move_dest_single(cells_mutation, 
+                                         origin_cells, 
+                                         dest_cells_row,
+                                         dest_list,
+                                         dest_to_update_type,
+                                         dest_to_update_position,
+                                         dest_to_update_id)
       
       # Updating the serving part ---------------------------------------
-      # Un-serving all those for destToUpdateType
-      residRowIds <- which(pxlsMutation$type=="resid")
-      pxlsMutation[residRowIds,unsrvdPopCol] <- pxlsMutation[residRowIds,"pxl_pop"]
+     
+      # Updating service for all destinations of the same type 
+       cells_mutation <- update_service_single(cells_mutation,
+                                               dest_list,
+                                               dest_to_update_type)
       
-      # Returning all dests of this type to full cap
-      destCapacity <- destList[destListRow,"capacity"]
-      destTypeCellRows <- which(pxlsMutation$type==destToUpdateType)
-      pxlsMutation[destTypeCellRows,totalPopCol] <- destCapacity
-      pxlsMutation[destTypeCellRows,reminderPopCol] <- destCapacity
-      
-      # Iterating over all destinations of type destToUpdateType
-      destTypeIDs <- pxlsMutation%>%filter(type==destToUpdateType)%>%distinct(destID) 
-      # dest <- destTypeIDs$destID[1]
-      echo(paste0("Revisiting service provided by: ",destToUpdateType," family"))
-      for(dest in destTypeIDs$destID){
-        destCellsRow <- which(pxlsMutation$destID==dest)
-        destCellsID <- pxlsMutation[which(pxlsMutation$destID==dest),"ID"]
-        
-        # Start serving people around
-        destGeom <- pxlsMutation %>% 
-          filter(ID%in%destCellsID) %>% 
-          st_as_sf(coords=c("pxl_x","pxl_y"), remove=F) %>% 
-          st_union() %>% 
-          st_convex_hull() 
-        
-        # Getting those within 20 min access    
-        cellsWithinDistRow <- destGeom %>% 
-          st_buffer(0.8) %>% 
-          st_intersects(st_as_sf(pxlsMutation,coords=c("pxl_x","pxl_y"), remove=F)) 
-        
-        cellsWithinDistID <- pxlsMutation[unlist(cellsWithinDistRow),] %>% 
-          st_as_sf(coords=c("pxl_x","pxl_y"), remove=F) %>% 
-          dplyr::mutate(dist2Dest=st_distance(.,destGeom)) %>% 
-          st_drop_geometry() %>% 
-          arrange(dist2Dest) %>%
-          dplyr::select(ID)
-
-        if(!nrow(cellsWithinDistID) > 0) echo("**Something is not right**")
-        # Serving cells 
-        system.time({
-        remainingCap <- pxlsMutation[destCellsRow,reminderPopCol][1]
-        closeCells <- pxlsMutation[which(pxlsMutation$ID %in% cellsWithinDistID$ID),]
-        # cell <- 1
-        for(cell in 1:nrow(closeCells)) {
-          # cellRow <- which(pxlsMutation$ID==id)
-          cellUnsrvedPop <-  closeCells[cell,unsrvdPopCol]
-          if (remainingCap > 0 & cellUnsrvedPop > 0){
-            pop2cover <- min(remainingCap,cellUnsrvedPop) # finding population to cover
-            # Updating the capapcity
-            remainingCap <- remainingCap-pop2cover
-            # Updating unserved pop
-            closeCells[cell,unsrvdPopCol] <- cellUnsrvedPop - pop2cover
-          }
-        }
-        pxlsMutation[which(pxlsMutation$ID %in% cellsWithinDistID$ID),] <- closeCells
-        pxlsMutation[destCellsRow,reminderPopCol] <- remainingCap
-        
-        })
-      }
-      
-      # Evaluating the mutation
-      scorePostMutation <- getScore(pxlsMutation, destList) 
-      if (scorePostMutation < scoreTemp) {
-        # Keeping the mutation result
-        echo(paste0("Found a good mutation, destintation ID= ",destToUpdateID,
-                    ", delta= ",(scorePostMutation-scoreTemp)))
-        pxlsTemp <- pxlsMutation
-        scoreTemp <- scorePostMutation
-      }else{
-        echo(paste0("Not a good mutation, destintation ID= ",destToUpdateID,
-                    ", delta= ",(scorePostMutation-scoreTemp)))
-        pxlsMutation <- pxlsTemp
-      }
+      # Evaluating the single destination mutation
+       scorePostMutation <- getScore(cells_mutation, dest_list) 
+       if (scorePostMutation < score_temp) {
+      #   # Keeping the mutation result
+         echo(paste0("Found a good mutation, destintation id= ", 
+                     dest_to_update_id,
+                     ", delta= ", (scorePostMutation - score_temp)))
+         
+         cells_temp <- cells_mutation
+         score_temp <- scorePostMutation
+         
+       }else{
+         echo(paste0("Not a good mutation, destintation id= ", 
+                     dest_to_update_id,
+                     ", delta= ",
+                     (scorePostMutation - score_temp)))
+         
+         cells_mutation <- cells_temp
+       }
     }
+    # Updating the serving part ---------------------------------------
+    
+    # Updating service for all destinations 
+    cells_mutation <- update_service_all(cells_mutation, dest_list)
     
 # Step7 Evaluation --------------------------------------------------------
     # Check the Score, If better keep, if not discard
     if(No_Answer_flag){  
-      scoreTemp <- nrow(dests)*(200)
+      score_temp <- nrow(dests) * 200
     }else{
-      scoreTemp <- getScore(pxlsTemp, destList) 
+      score_temp <- getScore(cells_temp, dest_list) 
     }
-    if(scoreTemp<scoreBest){
-      echo(paste0("Old best score: ",scoreBest))
-      echo(paste0("New best score: ",scoreTemp))
-      pxlsBest <- pxlsTemp
-      scoreBest <- scoreTemp
+    if(score_temp < score_best){
+      echo(paste0("Old best score: ", score_best))
+      echo(paste0("New best score: ", score_temp))
+      cells_best <- cells_mutation
+      score_best <- score_temp
     }else{
       echo("best score not changed")
-      convergenceCounter <- convergenceCounter + 1
-      echo(paste0("convergence counter: ", convergenceCounter))
-      echo(paste("Iteration_result,","NORMAL", sep = ","))
+      convergence_counter <- convergence_counter + 1
+      echo(paste0("convergence counter: ", convergence_counter))
+      echo(paste("Iteration_result,", "NORMAL", sep = ","))
     }
     echo("******, ******")
-    if(convergenceCounter>convergenceIterations){
-      echo(paste0("Skipping the rest, model seems to be converged at iter ", iter))
+    if(convergence_counter > convergence_iterations){
+      echo(paste0("Skipping the rest, model seems to be converged at iter ", 
+                  iter))
       break
     } 
-    echo(paste0("Iteration: ", iter, "Finished, DPH: ",dph))
+    echo(paste0("Iteration: ", iter, "Finished, DPH: ", dph))
     iter <- iter + 1
-    # pxlsTemp %>% 
-    #   mutate(density = dph) %>% 
-    #   st_as_sf(coords=c("pxl_x","pxl_y"), remove=F) %>% 
-    #   st_write(outputSqlite, remove=F,layer=paste0(dph,"dph_iter_",iter),delete_layer=T)
-    
+   
     } # end of if 
   } # End of While loop
   
   # writing the final outputs 
-  echo(paste0("Final best score: ", scoreBest))
+  echo(paste0("Final best score: ", score_best))
   # decision writing
-  pxlsTemp %>% 
+  cells_temp %>% 
     mutate(density = dph) %>% 
-    st_as_sf(coords=c("pxl_x","pxl_y"), remove=F) %>% 
-    st_write(outputSqlite, remove=F,layer=paste0(dph,"_final"),delete_layer=T)
+    st_as_sf(coords = c("pxl_x","pxl_y"), remove = F) %>% 
+    st_write(output_sqlite, remove = F, layer=paste0(dph, "_final"), 
+             delete_layer=T)
   sink()
 }
 
 # Setting initial parameters ----------------------------------------------
 pphh <- 2.6 # person per household
-pop <- 60000 # total population
+total_population <- 60000 # total population
 mutation_p <- 0.10 # mutate rate for optimization
 iters_max <- 50 # max number of iterations
-convergenceIterations <- 5
+convergence_iterations <- 5
 share_land_for_dest <- 0.15 # share of land for dest
 share_land_for_resid <- 0.85 # share of land for residential
 pxl_d <- 0.025 # pixel diameter
 nbhd_d <- 1.6 # neighbourhood diameter
-consider_categories <- T  
 densities <- seq(from = 15, to = 45, by = 5) # dwelling per hectare
-# Setting up folders ------------------------------------------------------
-#dph <- 15
 runs <- 10
-expTime <- format(Sys.time(),"%d%b%y_%H%M")
+experiment_time <- format(Sys.time(),"%d%b%y_%H%M")
+
+# Destinations
+dests <- read.csv("../inputs/destinations_v8.csv")
+
+# Setting up folders ------------------------------------------------------
+test_run <- T
+
+if(test_run){
+  densities <- seq(from = 25, to = 30, by = 5)
+  runs <- 2
+  iters_max <- 3
+}
+
+#dph <- 35
 for (dph in densities){
   #run <- 1
   for(run in 1:runs ){
@@ -599,7 +389,7 @@ for (dph in densities){
     
     echo(paste0("Starting dph ", dph, " run ", run))
 
-    output_dir <- paste0("../outputs/Exp3_",expTime)
+    output_dir <- paste0("../outputs/Exp3_",experiment_time)
     ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
     
     output_dir <- paste0(output_dir,"/Dph",dph,"_Run",run,"/")
@@ -608,24 +398,11 @@ for (dph in densities){
     output_deci_dir <- paste0(output_dir,"decisions") # CHANGE THIS FOR DIFFERENT RUNS
     ifelse(!dir.exists(output_deci_dir), dir.create(output_deci_dir), FALSE)
     
-    
-    total_scores_file <- paste0(output_dir, "score_summary_Run",run,".csv")
+    total_scores_file <- paste0(output_dir, "score_summary_Run", run, ".csv")
     total_score_df <- data.frame(density = densities)
     
-    outputSqlite <- paste0(output_deci_dir,"/pxls_Run",run,".sqlite")
+    output_sqlite <- paste0(output_deci_dir, "/pxls_Run", run, ".sqlite")
     
     optimise_nbhds(dph)
   }
-  
-  
 }
-
-
-
-#library(doParallel)  
-#no_cores <- min(( detectCores() - 1 ),  length(densities))
-#cl <- makeCluster(no_cores, type="FORK")  
-#registerDoParallel(cl)  
-#foreach(i=densities) %dopar% optimise_nbhds(i)
-#parLapply(cl, densities, optimise_nbhds)  
-#stopCluster(cl)  

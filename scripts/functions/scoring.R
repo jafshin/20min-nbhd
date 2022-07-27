@@ -1,17 +1,17 @@
 
-getScore <- function(pxlsDf, destList){
-  #pxlsDf <- pxlsInitial
-  tp <- pxlsDf %>% 
-    group_by(destID) %>% 
-    filter(destID!="NA") %>% 
+getScore <- function(cells_df, dest_list){
+  #cells_df <- pxlsInitial
+  tp <- cells_df %>% 
+    group_by(dest_id) %>% 
+    filter(dest_id!="NA") %>% 
     slice_sample(n=1) %>% 
     ungroup() %>% 
     dplyr::select(starts_with("pop_total")) %>% 
     sum()
   
-  tpr <- pxlsDf %>% 
-    group_by(destID) %>% 
-    filter(destID!="NA") %>% 
+  tpr <- cells_df %>% 
+    group_by(dest_id) %>% 
+    filter(dest_id!="NA") %>% 
     slice_sample(n=1) %>% 
     ungroup() %>% 
     select(starts_with("pop_remaining")) %>% 
@@ -19,59 +19,59 @@ getScore <- function(pxlsDf, destList){
   
   tpr <- ifelse(tpr==0,1,tpr)
   
-  no <- pxlsDf %>% 
-    filter(destID!="NA") %>% 
-    distinct(destID) %>% 
+  no <- cells_df %>% 
+    filter(dest_id!="NA") %>% 
+    distinct(dest_id) %>% 
     nrow()
   
   deci_score <- ifelse(tp>0,100*tpr/tp,0)
   
-  totalUnsrvdPop <-0
-  for (dest in destList$dest_code) {
-    totalUnsrvdPop <- get_unsrvd_pop(pxlsDf, dest) + totalUnsrvdPop
+  total_unserved_pop <-0
+  for (dest in dest_list$dest_code) {
+    total_unserved_pop <- get_unsrvd_pop(cells_df, dest) + total_unserved_pop
   }
-  scoreTemp <- 100*(totalUnsrvdPop/(pop*no)) +  deci_score
-  if(is.na(scoreTemp)) scoreTemp=200
-  return(scoreTemp)
+  score_temp <- 100*(total_unserved_pop/(pop*no)) +  deci_score
+  if(is.na(score_temp)) score_temp=200
+  return(score_temp)
   
 }
 
-getScore2 <- function(pxlsDf, destList){
-  #pxlsDf <- pxlsInitial
-  scoreTemp <- 0
-  #dest <- destList$destCode[1]
+getScore2 <- function(cells_df, dest_list){
+  #cells_df <- pxlsInitial
+  score_temp <- 0
+  #dest <- dest_list$dest_code[1]
   dest <- "cc"
-  for (dest in destList$destCode) {
+  for (dest in dest_list$dest_code) {
     echo(dest)
-    tp <- pxlsDf %>% 
-      filter(destID!="NA") %>% 
+    tp <- cells_df %>% 
+      filter(dest_id!="NA") %>% 
       filter(type==dest) %>% 
-      distinct(destID, .keep_all = T) %>% 
+      distinct(dest_id, .keep_all = T) %>% 
       dplyr::select(paste0("pop_total_",dest)) %>% 
       sum()
     
-    tpr <- pxlsDf %>% 
-      filter(destID!="NA") %>% 
+    tpr <- cells_df %>% 
+      filter(dest_id!="NA") %>% 
       filter(type==dest) %>% 
-      distinct(destID, .keep_all = T) %>% 
+      distinct(dest_id, .keep_all = T) %>% 
       dplyr::select(paste0("pop_remaining_",dest)) %>% 
       sum()
     
     tpr <- ifelse(tpr==0,1,tpr)
     
-    no_dw <- pxlsDf %>% 
-      filter(destID!="NA") %>% 
+    no_dw <- cells_df %>% 
+      filter(dest_id!="NA") %>% 
       filter(type==dest) %>% 
-      left_join(destList[,c("destCode","dest_weight")], by=c("type"="destCode")) %>% 
-      distinct(destID, .keep_all = T) %>% 
+      left_join(dest_list[,c("dest_code","dest_weight")], by=c("type"="dest_code")) %>% 
+      distinct(dest_id, .keep_all = T) %>% 
       group_by(type) %>% 
       summarise(no=n(), dw=dest_weight)%>%
       distinct(type, .keep_all = T) %>% 
       transmute(no_dw=no*dw)
     
-    scoreTemp <- scoreTemp + ((tp/tpr)+1)*no_dw$no_dw*(-1)
-    echo(scoreTemp)
+    score_temp <- score_temp + ((tp/tpr)+1)*no_dw$no_dw*(-1)
+    echo(score_temp)
   }
-  if(is.na(scoreTemp)) scoreTemp=nrow(pxlsDf)*-1
-  return(scoreTemp)
+  if(is.na(score_temp)) score_temp=nrow(cells_df)*-1
+  return(score_temp)
 }

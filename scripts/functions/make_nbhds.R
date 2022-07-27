@@ -9,7 +9,7 @@ make_nbhds <- function(nbhd_d, nbhd_n){
     st_as_sf(coords=c("x","y"))  %>% 
     mutate(dist_to_centre=as.numeric(st_distance(.,st_point(c(0.0,0.0))))) %>% 
     arrange(dist_to_centre) %>% 
-    mutate(ID=row_number())
+    mutate(id=row_number())
     
   nbhd_crs <- nbhd_sf %>% 
     st_coordinates() %>% 
@@ -28,7 +28,7 @@ make_nbhds <- function(nbhd_d, nbhd_n){
   nbhd_sq <- nbhd_sf %>% 
     st_drop_geometry() %>% 
     cbind(nbhd_crs) %>% 
-    dplyr::select(NBHD_ID=ID, geometry) %>% 
+    dplyr::select(nbhd_id=id, geometry) %>% 
     st_as_sf()
   
   return(nbhd_sq)

@@ -1,4 +1,4 @@
-id,dest_type_id,name,destCode,land_req,pop_req,capacity,access_mode,dist_in_20_min,coverage,position,positionType,order,lvl
+id,dest_type_id,name,dest_code,land_req,pop_req,capacity,access_mode,dist_in_20_min,coverage,position,position_type,order,lvl
 1001,1001,Health Clinic,hc,0.000115,1000,1500,walking,0.842105263157895,0.95,resid,free,9,1
 1002,1002,Corner Store/Convenience Store/Local shop,cs,0.000115,1000,1500,walking,0.842105263157895,0.95,resid,free,9,1
 1003,1003,Local Park,lp,0.0085,1000,1500,walking,0.842105263157895,0.95,resid,free,3,1

@@ -44,7 +44,7 @@ make_pixels_df <- function(pxl_d, total_pop, dwelling_per_h, person_per_hh, stud
   
   # Getting the cell centre coordinates
   pixls_centres <- pixls_crs %>% 
-    mutate(ID = row_number()) %>% 
+    mutate(id = row_number()) %>% 
     st_as_sf() %>% 
     st_centroid() %>% 
     st_join(nbhd_sq, largest = T)
@@ -52,10 +52,10 @@ make_pixels_df <- function(pxl_d, total_pop, dwelling_per_h, person_per_hh, stud
   # Joining cells and  their centre coordinates
   pixls_sq <- pixls_sf %>% 
     st_drop_geometry() %>% 
-    mutate(ID = row_number()) %>% 
+    mutate(id = row_number()) %>% 
     left_join(st_drop_geometry(pixls_centres)) %>% 
     cbind(pixls_crs) %>% 
-    dplyr::select(ID, NBHD_ID, dist_to_centre, geometry) %>% 
+    dplyr::select(id, nbhd_id, dist_to_centre, geometry) %>% 
     st_as_sf()
   
   return(pixls_sq)
