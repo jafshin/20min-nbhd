@@ -40,9 +40,8 @@ getScore2 <- function(cells_df, dest_list){
   #cells_df <- pxlsInitial
   score_temp <- 0
   #dest <- dest_list$dest_code[1]
-  dest <- "cc"
+  # dest <- "cc"
   for (dest in dest_list$dest_code) {
-    echo(dest)
     tp <- cells_df %>% 
       filter(dest_id!="NA") %>% 
       filter(type==dest) %>% 
@@ -70,7 +69,6 @@ getScore2 <- function(cells_df, dest_list){
       transmute(no_dw=no*dw)
     
     score_temp <- score_temp + ((tp/tpr)+1)*no_dw$no_dw*(-1)
-    echo(score_temp)
   }
   if(is.na(score_temp)) score_temp=nrow(cells_df)*-1
   return(score_temp)
