@@ -4,9 +4,6 @@
 #
 # @author AJ
 
-# TODO, fix the issue with co-located destination mutation 
-# TODO fix the issue with old IDs
-
 # Packages ----------------------------------------------------------------
 library(rdist)
 library(dplyr)
@@ -295,13 +292,15 @@ optimise_nbhds <- function(dph) {
       
       # if yes, then all child destinations will be added to the mutation list
       if(nrow(orphaned_cells) > 0){
-        echo(paste0("Found an orphaned cell, adding destination, ", 
-                    orphaned_cells_formatted$dest_id, " to the mutation list"))
         orphaned_cells_formatted <- orphaned_cells %>% 
           distinct(dest_id, type, parent_dest_id) %>% 
           ungroup() %>% 
           as.data.frame()
+        
         dests_to_update <- rbind(dests_to_update, orphaned_cells_formatted)
+        
+        echo(paste0("Found an orphaned cell, adding destination, ", 
+                    orphaned_cells_formatted$dest_id, " to the mutation list"))
       } 
       
       # Updating the serving part ---------------------------------------
@@ -390,7 +389,7 @@ nbhd_d <- 1.6 # neighbourhood diameter
 densities <- seq(from = 15, to = 45, by = 5) # dwelling per hectare
 runs <- 10
 experiment_time <- format(Sys.time(),"%d%b%y_%H%M")
-test_run <- T # set true if you want a small experimental run 
+test_run <- F # set true if you want a small experimental run 
 
 # Destinations
 dests <- read.csv("../inputs/destinations_v8.csv")
