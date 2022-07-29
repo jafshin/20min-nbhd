@@ -152,18 +152,33 @@ move_dest_single <- function(cells_mutation,
     summarise(total = sum(pxl_pop)) %>% 
     as.numeric()
   
+  cells_mutation[origin_cells, "type"] <- dest_to_update_position # Setting orig cells to their parent type
+  
+  # Assigning origin cells parent id, to the origin cells current id
+  cells_mutation[origin_cells, "dest_id"] <- cells_mutation[origin_cells,"parent_dest_id"] 
+  
+  
+  
+  
+  
+  
   # Adding destinations to the previously resids
   cells_mutation[dest_cells_row, "type"] <- dest_to_update_type
+  
+  # Setting parent ID to be whatever was there before
+  cells_mutation[dest_cells_row, "parent_dest_id"] <- cells_mutation[dest_cells_row,"dest_id"] 
+  
+  
+  
+  
   cells_mutation[dest_cells_row, "dest_id"] <- dest_to_update_id
+  
   cells_mutation[dest_cells_row, "pxl_pop"] <- 0 # not resid anymore
   capacity_to_add <- dest_list[dest_list_row, "capacity"]
   cells_mutation[dest_cells_row, total_pop_col] <- capacity_to_add
   cells_mutation[dest_cells_row, reminder_pop_col] <- capacity_to_add
   cells_mutation[dest_cells_row, num_dest_col] <- 1
   
-  cells_mutation[origin_cells, "type"] <- dest_to_update_position # Setting orig cells to their parent type
-  
-  cells_mutation[origin_cells, "dest_id"] <- "NA" # TODO save the orig dest id
   
   # Adding population to the previously dests
   

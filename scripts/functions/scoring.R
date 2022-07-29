@@ -1,5 +1,5 @@
 
-getScore <- function(cells_df, dest_list){
+getScore <- function(cells_df, dest_list, total_population){
   #cells_df <- pxlsInitial
   tp <- cells_df %>% 
     group_by(dest_id) %>% 
@@ -30,7 +30,7 @@ getScore <- function(cells_df, dest_list){
   for (dest in dest_list$dest_code) {
     total_unserved_pop <- get_unsrvd_pop(cells_df, dest) + total_unserved_pop
   }
-  score_temp <- 100*(total_unserved_pop/(pop*no)) +  deci_score
+  score_temp <- 100*(total_unserved_pop/(total_population*no)) +  deci_score
   if(is.na(score_temp)) score_temp=200
   return(score_temp)
   

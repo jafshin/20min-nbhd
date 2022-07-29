@@ -77,7 +77,7 @@ make_layout <- function(nbhd_d,
   }
   
   cells <- cells %>% filter(pxl_pop > 0) %>% # Just keeping the pixels with pop
-    mutate(type = "resid", dest_id = "NA")
+    mutate(type = "resid", dest_id = "NA", parent_dest_id = "NA", child_dest_id= "NA") 
   
   return(cells)
 }

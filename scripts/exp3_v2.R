@@ -1,4 +1,3 @@
-
 #### NEIGHBOURHOOD FACILTIY LOCATION OPTIMISATION #### 
 # This is a code that optimizes a neighborhood destination locations to achieve 20 Min
 # neighbourhood using an evolutionary algorithm
@@ -6,6 +5,7 @@
 # @author AJ
 
 # TODO, fix the issue with co-located destination mutation 
+# TODO fix the issue with old IDs
 
 # Packages ----------------------------------------------------------------
 library(rdist)
@@ -26,6 +26,7 @@ source("./functions/make-layout.R")
 echo<- function(msg) {
   cat(paste0(as.character(Sys.time()), ' | ', msg,"\n"))  
 } 
+
 # dph <- 25
 optimise_nbhds <- function(dph) {
 # Step 0: Setting up inputs and structure ---------------------------------
@@ -40,6 +41,7 @@ optimise_nbhds <- function(dph) {
   echo(paste0("***********,", "***********"))
 
 # Step 1 Creating decision grid -------------------------------------------
+  
   echo("Step 1 starts - Creating decision grid")
   
   cells <- suppressWarnings(make_layout(nbhd_d, share_land_for_resid, 
@@ -101,7 +103,7 @@ optimise_nbhds <- function(dph) {
           (get_unsrvd_pop(cells_initial,dest_code) > total_population *
            (1 - dest_list$coverage[dest_row]))){ # loop until we have destinations to use
       # CREATING A LIST OF DIFFERENT LOCATIONS AND THEIR POTENTIAL CATCHMENTS
-
+      
       system.time(
         dest_cells_id <- findDestinationCells(cells_initial, dest_list, 
                                               cells_to_occupy, 
@@ -115,11 +117,17 @@ optimise_nbhds <- function(dph) {
         No_Answer_flag <- TRUE
         break();
       }
+      
       # Add destination to the the cell
+      
       cells_initial$type[dest_cells_row] <- dest_code
       remaining_num_dests <- remaining_num_dests - 1
+      # Setting parent ID to be whatever was there before
+      cells_initial[dest_cells_row, "parent_dest_id"] <- cells_initial$dest_id[dest_cells_row] 
+      # Setting the current dest ID
       cells_initial$dest_id[dest_cells_row] <- paste0(dest_code,"_",
                                              dest_list$num_dests[dest_row] - remaining_num_dests)
+      
       # Adding new capacity
       reminderPopCol <- paste0("pop_remaining_",dest_code)
       totalPopCol <- paste0("pop_total_",dest_code)
@@ -209,7 +217,7 @@ optimise_nbhds <- function(dph) {
   if(No_Answer_flag){  
     score_temp <- nrow(dests) * 200
   }else{
-    score_temp <- getScore(cells_initial_updated, dest_list) 
+    score_temp <- getScore(cells_initial_updated, dest_list, total_population) 
     cells_best <- cells_initial_updated
     score_best <- score_temp
   }
@@ -229,11 +237,10 @@ optimise_nbhds <- function(dph) {
     
     # Select some dests to mutate:
     dests_to_update <- cells_temp %>% 
-      filter(dest_id!="NA") %>%  
-      group_by(dest_id,type) %>% 
-      summarise(areaPxls=n()) %>% 
+      filter(dest_id != "NA") %>%  
+      distinct(dest_id, type, parent_dest_id) %>% 
       ungroup() %>% 
-      slice_sample(prop=mutation_p) %>% 
+      slice_sample(prop = mutation_p) %>% 
       as.data.frame()
     
     if(nrow(dests_to_update) == 0) echo("Mutation skipped")
@@ -281,30 +288,45 @@ optimise_nbhds <- function(dph) {
                                          dest_to_update_type,
                                          dest_to_update_position,
                                          dest_to_update_id)
+     
+      # Check if any other destinations had this destination as the parent
+      orphaned_cells <- cells_mutation %>% 
+        filter(parent_dest_id == dest_to_update_id)
+      
+      # if yes, then all child destinations will be added to the mutation list
+      if(nrow(orphaned_cells) > 0){
+        echo(paste0("Found an orphaned cell, adding destination, ", 
+                    orphaned_cells_formatted$dest_id, " to the mutation list"))
+        orphaned_cells_formatted <- orphaned_cells %>% 
+          distinct(dest_id, type, parent_dest_id) %>% 
+          ungroup() %>% 
+          as.data.frame()
+        dests_to_update <- rbind(dests_to_update, orphaned_cells_formatted)
+      } 
       
       # Updating the serving part ---------------------------------------
      
       # Updating service for all destinations of the same type 
-       cells_mutation <- update_service_single(cells_mutation,
+      cells_mutation <- update_service_single(cells_mutation,
                                                dest_list,
                                                dest_to_update_type)
       
       # Evaluating the single destination mutation
-       scorePostMutation <- getScore(cells_mutation, dest_list) 
-       if (scorePostMutation < score_temp) {
+       score_post_mutation <- getScore(cells_mutation, dest_list, total_population) 
+       if (score_post_mutation < score_temp) {
       #   # Keeping the mutation result
          echo(paste0("Found a good mutation, destintation id= ", 
                      dest_to_update_id,
-                     ", delta= ", (scorePostMutation - score_temp)))
+                     ", delta= ", (score_post_mutation - score_temp)))
          
          cells_temp <- cells_mutation
-         score_temp <- scorePostMutation
+         score_temp <- score_post_mutation
          
        }else{
          echo(paste0("Not a good mutation, destintation id= ", 
                      dest_to_update_id,
                      ", delta= ",
-                     (scorePostMutation - score_temp)))
+                     (score_post_mutation - score_temp)))
          
          cells_mutation <- cells_temp
        }
@@ -319,7 +341,7 @@ optimise_nbhds <- function(dph) {
     if(No_Answer_flag){  
       score_temp <- nrow(dests) * 200
     }else{
-      score_temp <- getScore(cells_temp, dest_list) 
+      score_temp <- getScore(cells_temp, dest_list, total_population) 
     }
     if(score_temp < score_best){
       echo(paste0("Old best score: ", score_best))
@@ -368,12 +390,12 @@ nbhd_d <- 1.6 # neighbourhood diameter
 densities <- seq(from = 15, to = 45, by = 5) # dwelling per hectare
 runs <- 10
 experiment_time <- format(Sys.time(),"%d%b%y_%H%M")
+test_run <- T # set true if you want a small experimental run 
 
 # Destinations
 dests <- read.csv("../inputs/destinations_v8.csv")
 
 # Setting up folders ------------------------------------------------------
-test_run <- T
 
 if(test_run){
   densities <- seq(from = 25, to = 30, by = 5)
