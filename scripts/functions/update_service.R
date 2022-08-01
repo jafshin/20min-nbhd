@@ -154,22 +154,20 @@ move_dest_single <- function(cells_mutation,
   
   cells_mutation[origin_cells, "type"] <- dest_to_update_position # Setting orig cells to their parent type
   
+  # Get the grant parent's ID
+  parent_dest_id <- cells_mutation[origin_cells,"parent_dest_id"][1]
+  grand_parent_dest_id <- cells_mutation[which(cells_mutation$dest_id==parent_dest_id),"parent_dest_id"][1]
+  
+  
   # Assigning origin cells parent id, to the origin cells current id
-  cells_mutation[origin_cells, "dest_id"] <- cells_mutation[origin_cells,"parent_dest_id"] 
-  
-  
-  
-  
-  
+  cells_mutation[origin_cells, "dest_id"] <- parent_dest_id 
+  cells_mutation[origin_cells, "parent_dest_id"] <- grand_parent_dest_id
   
   # Adding destinations to the previously resids
   cells_mutation[dest_cells_row, "type"] <- dest_to_update_type
   
   # Setting parent ID to be whatever was there before
   cells_mutation[dest_cells_row, "parent_dest_id"] <- cells_mutation[dest_cells_row,"dest_id"] 
-  
-  
-  
   
   cells_mutation[dest_cells_row, "dest_id"] <- dest_to_update_id
   
