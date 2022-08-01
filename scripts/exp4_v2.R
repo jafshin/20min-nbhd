@@ -48,7 +48,7 @@ optimise_nbhds <- function(dph) {
   cells <- suppressWarnings(make_layout(nbhd_d, share_land_for_resid, 
                                         total_population, dph, pphh, pxl_d))
   pxl_a <- pxl_d*pxl_d
-   # Adding area in terms of pixel to list
+  # Adding area in terms of pixel to list
   dests <- dests %>% 
     rowwise() %>% 
     mutate(area_in_cells = ifelse(test = dest_code == "cc",
@@ -60,7 +60,7 @@ optimise_nbhds <- function(dph) {
   # meaning starting from those big and high pop destinations
   dests <- dests %>%
     arrange(order, desc(land_req), desc(pop_req))
-
+  
   # Adding weights for scoring
   dests <- dests %>%
     mutate(land_for_weight = ifelse(land_req == 0, 0.008000, land_req)) %>% 
@@ -117,7 +117,7 @@ optimise_nbhds <- function(dph) {
            (1 - dest_list$coverage[dest_row])) &
           num_dests<max_dests &
           findSpace(cells_initial, dest_code, cells_to_occupy, dest_lvl)){ # loop until all are served AND we have destinations to use
-     
+      
       # CREATING A LIST OF DIFFERENT LOCATIONS AND THEIR POTENTIAL CATCHMENTS
       system.time(
         dest_cells_id <- findDestinationCells(cells_initial, dest_list, 
@@ -260,126 +260,126 @@ optimise_nbhds <- function(dph) {
     
     if(nrow(dests_to_update) == 0) echo("Mutation skipped")
     if(nrow(dests_to_update) != 0){
-    # Changing the locations with free cells
-    cells_mutation <- cells_temp
-    # i = 12
-    for (i in 1:nrow(dests_to_update)){
-      
-      dest_to_update_id <- dests_to_update[i,"dest_id"]
-      dest_to_update_type <- dests_to_update[i,"type"]
-      cells_to_move <- unlist(dest_list[which(
-        dest_list[,"dest_code"] == dest_to_update_type), "area_in_cells"])
-      dest_to_update_lvl <- unlist(dest_list[which(
-        dest_list[,"dest_code"] == dest_to_update_type),"lvl"])
-      dest_to_update_position <- unlist(dest_list[which(
-        dest_list[,"dest_code"] == dest_to_update_type),"position"])
-      dest_to_update_radius <- max(( pxl_d / 2 ) + 0.001 , unlist(sqrt(
-        dest_list[which(dest_list[, "dest_code"] == dest_to_update_type), 
-                  "land_req"] / pi)))
-      
-      origin_cells <- which(cells_mutation$dest_id == dest_to_update_id)
-    
-      # Find where to move
-      dest_cells_id <- findDestinationCells(cells_mutation, 
-                                            dest_list,
-                                            cells_to_move,
-                                            dest_to_update_type,
-                                            pxl_a,
-                                            dest_to_update_lvl,
-                                            dest_to_update_radius)
-      
-      if(length(dest_cells_id) == 0){
-        echo("No Answer")
-        No_Answer_flag <- TRUE
-        break();}
-      dest_cells_row <- which(cells_mutation$id %in% dest_cells_id)
-      
-      # Moving destination from origin_cells to dest_cells_row
-      cells_mutation <- move_dest_single(cells_mutation, 
-                                         origin_cells, 
-                                         dest_cells_row,
-                                         dest_list,
-                                         dest_to_update_type,
-                                         dest_to_update_position,
-                                         dest_to_update_id)
-      
-      # Check if any other destinations had this destination as the parent
-      orphaned_cells <- cells_mutation %>% 
-        filter(parent_dest_id == dest_to_update_id)
-      
-      # if yes, then all child destinations will be added to the mutation list
-      if(nrow(orphaned_cells) > 0){
+      # Changing the locations with free cells
+      cells_mutation <- cells_temp
+      # i = 12
+      for (i in 1:nrow(dests_to_update)){
         
-        orphaned_cells_formatted <- orphaned_cells %>% 
-          distinct(dest_id, type, parent_dest_id) %>% 
-          ungroup() %>% 
-          as.data.frame()
+        dest_to_update_id <- dests_to_update[i,"dest_id"]
+        dest_to_update_type <- dests_to_update[i,"type"]
+        cells_to_move <- unlist(dest_list[which(
+          dest_list[,"dest_code"] == dest_to_update_type), "area_in_cells"])
+        dest_to_update_lvl <- unlist(dest_list[which(
+          dest_list[,"dest_code"] == dest_to_update_type),"lvl"])
+        dest_to_update_position <- unlist(dest_list[which(
+          dest_list[,"dest_code"] == dest_to_update_type),"position"])
+        dest_to_update_radius <- max(( pxl_d / 2 ) + 0.001 , unlist(sqrt(
+          dest_list[which(dest_list[, "dest_code"] == dest_to_update_type), 
+                    "land_req"] / pi)))
         
-        dests_to_update <- rbind(dests_to_update, orphaned_cells_formatted)
+        origin_cells <- which(cells_mutation$dest_id == dest_to_update_id)
         
-        echo(paste0("Found an orphaned cell, adding destination, ", 
-                    orphaned_cells_formatted$dest_id, " to the mutation list"))
-      } 
+        # Find where to move
+        dest_cells_id <- findDestinationCells(cells_mutation, 
+                                              dest_list,
+                                              cells_to_move,
+                                              dest_to_update_type,
+                                              pxl_a,
+                                              dest_to_update_lvl,
+                                              dest_to_update_radius)
+        
+        if(length(dest_cells_id) == 0){
+          echo("No Answer")
+          No_Answer_flag <- TRUE
+          break();}
+        dest_cells_row <- which(cells_mutation$id %in% dest_cells_id)
+        
+        # Moving destination from origin_cells to dest_cells_row
+        cells_mutation <- move_dest_single(cells_mutation, 
+                                           origin_cells, 
+                                           dest_cells_row,
+                                           dest_list,
+                                           dest_to_update_type,
+                                           dest_to_update_position,
+                                           dest_to_update_id)
+        
+        # Check if any other destinations had this destination as the parent
+        orphaned_cells <- cells_mutation %>% 
+          filter(parent_dest_id == dest_to_update_id)
+        
+        # if yes, then all child destinations will be added to the mutation list
+        if(nrow(orphaned_cells) > 0){
+          
+          orphaned_cells_formatted <- orphaned_cells %>% 
+            distinct(dest_id, type, parent_dest_id) %>% 
+            ungroup() %>% 
+            as.data.frame()
+          
+          dests_to_update <- rbind(dests_to_update, orphaned_cells_formatted)
+          
+          echo(paste0("Found an orphaned cell, adding destination, ", 
+                      orphaned_cells_formatted$dest_id, " to the mutation list"))
+        } 
+        
+        # Updating the serving part ---------------------------------------
+        
+        # Updating service for all destinations of the same type 
+        cells_mutation <- update_service_single(cells_mutation,
+                                                dest_list,
+                                                dest_to_update_type)
+        
+        # Evaluating the mutation
+        score_post_mutation <- getScore2(cells_mutation, dest_list) 
+        if (score_post_mutation < score_temp) {
+          # Keeping the mutation result
+          echo(paste0("Found a good mutation, destintation id = ", 
+                      dest_to_update_id, 
+                      ", delta = ", (score_post_mutation - score_temp)))
+          cells_temp <- cells_mutation
+          score_temp <- score_post_mutation
+        }else{
+          echo(paste0("Not a good mutation, destintation id = ", 
+                      dest_to_update_id, 
+                      ", delta = ", (score_post_mutation - score_temp)))
+          cells_mutation <- cells_temp
+        }
+      }
       
       # Updating the serving part ---------------------------------------
       
-      # Updating service for all destinations of the same type 
-      cells_mutation <- update_service_single(cells_mutation,
-                                              dest_list,
-                                              dest_to_update_type)
+      # Updating service for all destinations 
+      cells_mutation <- update_service_all(cells_mutation, dest_list)
       
-      # Evaluating the mutation
-      score_post_mutation <- getScore2(cells_mutation, dest_list) 
-      if (score_post_mutation < score_temp) {
-        # Keeping the mutation result
-        echo(paste0("Found a good mutation, destintation id = ", 
-                    dest_to_update_id, 
-                    ", delta = ", (score_post_mutation - score_temp)))
-        cells_temp <- cells_mutation
-        score_temp <- score_post_mutation
+      # Step7 Evaluation --------------------------------------------------------
+      # Check the Score, If better keep, if not discard
+      if(No_Answer_flag){  
+        score_temp <- nrow(cells_temp) * (-1)
       }else{
-        echo(paste0("Not a good mutation, destintation id = ", 
-                    dest_to_update_id, 
-                    ", delta = ", (score_post_mutation - score_temp)))
-        cells_mutation <- cells_temp
+        score_temp <- getScore2(cells_temp, dest_list) 
       }
-    }
-    
-    # Updating the serving part ---------------------------------------
-    
-    # Updating service for all destinations 
-    cells_mutation <- update_service_all(cells_mutation, dest_list)
-    
-    # Step7 Evaluation --------------------------------------------------------
-    # Check the Score, If better keep, if not discard
-    if(No_Answer_flag){  
-      score_temp <- nrow(cells_temp) * (-1)
-    }else{
-      score_temp <- getScore2(cells_temp, dest_list) 
-    }
-    if(score_temp < score_best){
-      echo(paste0("Old best score: ", score_best))
-      echo(paste0("New best score: ", score_temp))
-      cells_best <- cells_mutation
-      score_best <- score_temp
-    }else{
-      echo("best score not changed")
-      convergence_counter <- convergence_counter + 1
-      echo(paste0("convergence counter: ", convergence_counter))
-      echo(paste("Iteration_result, ", "NORMAL", sep = ", "))
-    }
-    echo("******, ******")
-    if(convergence_counter > convergence_iterations){
-      echo(paste0("Skipping the rest, model seems to be converged at iter ", iter))
-      break
-    } 
-    echo(paste0("Iteration: ", iter, "Finished, DPH: ", dph))
-    iter <- iter + 1
-    # cells_temp %>% 
-    #   mutate(density = dph) %>% 
-    #   st_as_sf(coords = c("pxl_x", "pxl_y"), remove = F) %>% 
-    #   st_write(output_sqlite, remove = F, layer = paste0(dph, "dph_iter_", iter), delete_layer = T)
-  } # end of if 
+      if(score_temp < score_best){
+        echo(paste0("Old best score: ", score_best))
+        echo(paste0("New best score: ", score_temp))
+        cells_best <- cells_mutation
+        score_best <- score_temp
+      }else{
+        echo("best score not changed")
+        convergence_counter <- convergence_counter + 1
+        echo(paste0("convergence counter: ", convergence_counter))
+        echo(paste("Iteration_result, ", "NORMAL", sep = ", "))
+      }
+      echo("******, ******")
+      if(convergence_counter > convergence_iterations){
+        echo(paste0("Skipping the rest, model seems to be converged at iter ", iter))
+        break
+      } 
+      echo(paste0("Iteration: ", iter, "Finished, DPH: ", dph))
+      iter <- iter + 1
+      # cells_temp %>% 
+      #   mutate(density = dph) %>% 
+      #   st_as_sf(coords = c("pxl_x", "pxl_y"), remove = F) %>% 
+      #   st_write(output_sqlite, remove = F, layer = paste0(dph, "dph_iter_", iter), delete_layer = T)
+    } # end of if 
   } # End of While loop
   
   # writing the final outputs 

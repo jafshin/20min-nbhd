@@ -7,7 +7,7 @@ get_unsrvd_pop <- function(cells_temp, dest_code){
   return(unsrvd)
 } 
 
-findSpace <- function(cells_temp,dest_code, cells_to_occupy,dest_lvl){
+findSpace <- function(cells_temp,dest_code, cells_to_occupy, dest_lvl){
   
   if(dest_lvl==1) cells_temp_grouped <- cells_temp %>% group_by(nbhd_q)
   if(dest_lvl==2) cells_temp_grouped <- cells_temp %>% group_by(nbhd_id)
