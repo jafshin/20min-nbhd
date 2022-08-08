@@ -24,7 +24,7 @@ echo<- function(msg) {
   cat(paste0(as.character(Sys.time()), ' | ', msg,"\n"))  
 } 
 
-# dph <- 25
+# dph <- 35
 optimise_nbhds <- function(dph) {
   # Step 0: Setting up inputs and structure ---------------------------------
   echo(paste0("******************* DWELLING DENSITY: ", dph))
@@ -392,7 +392,7 @@ experiment_time <- format(Sys.time(),"%d%b%y_%H%M")
 test_run <- F # set true if you want a small experimental run 
 
 # Destinations
-dests <- read.csv("../inputs/destinations_v8.csv")
+dests <- read.csv("./inputs/destinations_v8.csv")
 
 # Setting up folders ------------------------------------------------------
 
