@@ -68,7 +68,7 @@ make_layout <- function(nbhd_d,
     for (px in my_cells){
       rnd_number <- runif(1, 0, 1)
       if(rnd_number<prob_h){
-        cells[px, "pxl_pop"] <- min(prob_h, remaining_population)
+        cells[px, "pxl_pop"] <- min(cell_population_h, remaining_population)
       }else{
         cells[px, "pxl_pop"] <- min(cell_population_l, remaining_population)
       }
