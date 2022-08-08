@@ -5,8 +5,8 @@ make_layout <- function(nbhd_d,
                         pphh, 
                         pxl_d){
   
-  source("./functions/make_nbhds.R")
-  source("./functions/make_pixels_df.R")
+  source("./models/functions/make_nbhds.R")
+  source("./models/functions/make_pixels_df.R")
   
   nbhd_dev_area <- nbhd_d^2 * share_land_for_resid # land for development per nbhd
   nbhd_n <- ceiling(total_population * 0.01 / (dph * pphh * nbhd_dev_area)) # number of nbhds

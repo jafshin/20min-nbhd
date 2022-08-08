@@ -177,6 +177,11 @@ move_dest_single <- function(cells_mutation,
   cells_mutation[dest_cells_row, reminder_pop_col] <- capacity_to_add
   cells_mutation[dest_cells_row, num_dest_col] <- 1
   
+  # remove unserved population for all destinations from the destination cells
+  for(dt in dest_list$dest_code){
+    not_served_col_dt <- paste0("not_served_by_", dt)
+    cells_mutation[dest_cells_row,not_served_col_dt] <- 0
+  }
   
   # Adding population to the previously dests
   
@@ -188,7 +193,7 @@ move_dest_single <- function(cells_mutation,
     origin_cells[1:extra_pop],"pxl_pop"] + 1  
   cells_mutation[origin_cells, total_pop_col] <- 0
   cells_mutation[origin_cells, reminder_pop_col] <- 0
-  cells_mutation[dest_cells_row, num_dest_col] <- 0
+  cells_mutation[origin_cells, num_dest_col] <- 0
   
   return(cells_mutation)
 }
