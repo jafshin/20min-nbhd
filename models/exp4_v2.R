@@ -233,7 +233,7 @@ optimise_nbhds <- function(dph) {
   if(No_Answer_flag){  
     score_temp <- nrow(cells_initial_updated)*(-1)
   }else{
-    score_temp <- getScore2(cells_initial_updated, dest_list) 
+    score_temp <- get_score2(cells_initial_updated, dest_list, total_population) 
     cells_best <- cells_initial_updated
     score_best <- score_temp
   }
@@ -329,7 +329,7 @@ optimise_nbhds <- function(dph) {
                                                 dest_to_update_type)
         
         # Evaluating the mutation
-        score_post_mutation <- getScore2(cells_mutation, dest_list) 
+        score_post_mutation <- get_score2(cells_mutation, dest_list, total_population) 
         if (score_post_mutation < score_temp) {
           # Keeping the mutation result
           echo(paste0("Found a good mutation, destintation id = ", 
@@ -355,7 +355,7 @@ optimise_nbhds <- function(dph) {
       if(No_Answer_flag){  
         score_temp <- nrow(cells_temp) * (-1)
       }else{
-        score_temp <- getScore2(cells_temp, dest_list) 
+        score_temp <- get_score2(cells_temp, dest_list, total_population) 
       }
       if(score_temp < score_best){
         echo(paste0("Old best score: ", score_best))
@@ -409,7 +409,7 @@ experiment_time <- format(Sys.time(),"%d%b%y_%H%M")
 test_run <- F # set true if you want a small experimental run 
 
 # Destinations
-dests <- read.csv("../inputs/destinations_v8.csv")
+dests <- read.csv("./inputs/destinations_v8.csv")
 
 # Setting up folders ------------------------------------------------------
 
@@ -424,11 +424,11 @@ if(test_run){
 for (dph in densities){
   # run <- 2
   for(run in 1:runs ){
-    dir.create("../outputs/", showWarnings = FALSE)
+    dir.create("./outputs/", showWarnings = FALSE)
     
     echo(paste0("Starting dph ", dph, " run ", run))
     
-    output_dir <- paste0("../outputs/Exp4_",experiment_time)
+    output_dir <- paste0("./outputs/Exp4_",experiment_time)
     ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
     
     output_dir <- paste0(output_dir,"/Dph",dph,"_Run",run,"/")

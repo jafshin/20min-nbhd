@@ -214,7 +214,7 @@ optimise_nbhds <- function(dph) {
   if(No_Answer_flag){  
     score_temp <- nrow(dests) * 200
   }else{
-    score_temp <- getScore(cells_initial_updated, dest_list, total_population) 
+    score_temp <- get_score(cells_initial_updated, dest_list, total_population) 
     cells_best <- cells_initial_updated
     score_best <- score_temp
   }
@@ -311,7 +311,7 @@ optimise_nbhds <- function(dph) {
                                                 dest_to_update_type)
         
         # Evaluating the single destination mutation
-        score_post_mutation <- getScore(cells_mutation, dest_list, total_population) 
+        score_post_mutation <- get_score(cells_mutation, dest_list, total_population) 
         if (score_post_mutation < score_temp) {
           #   # Keeping the mutation result
           echo(paste0("Found a good mutation, destintation id= ", 
@@ -340,7 +340,7 @@ optimise_nbhds <- function(dph) {
       if(No_Answer_flag){  
         score_temp <- nrow(dests) * 200
       }else{
-        score_temp <- getScore(cells_temp, dest_list, total_population) 
+        score_temp <- get_score(cells_temp, dest_list, total_population) 
       }
       if(score_temp < score_best){
         echo(paste0("Old best score: ", score_best))
@@ -389,7 +389,7 @@ nbhd_d <- 1.6 # neighbourhood diameter
 densities <- seq(from = 15, to = 45, by = 5) # dwelling per hectare
 runs <- 10
 experiment_time <- format(Sys.time(),"%d%b%y_%H%M")
-test_run <- F # set true if you want a small experimental run 
+test_run <- T # set true if you want a small experimental run 
 
 # Destinations
 dests <- read.csv("./inputs/destinations_v8.csv")
@@ -397,20 +397,20 @@ dests <- read.csv("./inputs/destinations_v8.csv")
 # Setting up folders ------------------------------------------------------
 
 if(test_run){
-  densities <- seq(from = 25, to = 30, by = 5)
-  runs <- 2
-  iters_max <- 3
+  densities <- seq(from = 30, to = 35, by = 5)
+  runs <- 1
+  iters_max <- 1
 }
 
 #dph <- 15
 for (dph in densities){
   #run <- 1
   for(run in 1:runs ){
-    dir.create("../outputs/", showWarnings = FALSE)
+    dir.create("./outputs/", showWarnings = FALSE)
     
     echo(paste0("Starting dph ", dph, " run ", run))
     
-    output_dir <- paste0("../outputs/Exp3_",experiment_time)
+    output_dir <- paste0("./outputs/Exp3_",experiment_time)
     ifelse(!dir.exists(output_dir), dir.create(output_dir), FALSE)
     
     output_dir <- paste0(output_dir,"/Dph",dph,"_Run",run,"/")
