@@ -16,10 +16,10 @@ library(readr)
 library(stringr)
 
 # Functions ---------------------------------------------------------------
-source("./functions/land_updating.R")
-source("./functions/update_service.R")
-source("./functions/scoring.R")
-source("./functions/make-layout.R")
+source("./models/functions/land_updating.R")
+source("./models/functions/update_service.R")
+source("./models/functions/scoring.R")
+source("./models/functions/make-layout.R")
 
 echo<- function(msg) {
   cat(paste0(as.character(Sys.time()), ' | ', msg,"\n"))  
