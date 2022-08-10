@@ -5,9 +5,9 @@ get_score <- function(cells_df, dest_list, total_population){
   cells_distinct <- cells_df %>% 
     filter(type!="resid") %>%
     distinct(dest_id, .keep_all = T) 
-
-# Capacity ----------------------------------------------------------------
-
+  
+  # Capacity ----------------------------------------------------------------
+  
   # Get the total added capacity per destination type
   # tc = total capacity
   capacity_df <- cells_distinct %>% 
@@ -32,11 +32,11 @@ get_score <- function(cells_df, dest_list, total_population){
     distinct(type) %>% 
     left_join(capacity_df, by = "type") %>% 
     left_join(capacity_remaining_df, by = "type") %>% 
-    mutate(unused_capacity_ratio = 100 * capacity_remaining / capacity) %>% 
+    mutate(unused_capacity_pct = 100 * capacity_remaining / capacity) %>% 
     dplyr::select(-c(capacity_remaining, capacity))
   
-# Service -----------------------------------------------------------------
-
+  # Service -----------------------------------------------------------------
+  
   for (i in 1:nrow(destinations)) {
     dt <- destinations$type[i]
     destinations[i, "unserved_population"] <- cells_df %>% 
@@ -45,24 +45,22 @@ get_score <- function(cells_df, dest_list, total_population){
   }
   
   destinations <- destinations %>% 
-    mutate(unserved_population_ratio = 
+    mutate(unserved_population_pct = 
              100 * unserved_population / total_population) %>% 
     dplyr::select(-unserved_population)
-
-# Total Score -------------------------------------------------------------
-
-  score_temp <- destinations %>% 
-    dplyr::select(-type) %>% 
-    sum()
+  
+  # Total Score -------------------------------------------------------------
+  
+  score_temp <- destinations %>% dplyr::select(-type) %>% sum()
   
   if(is.na(score_temp)) score_temp=200*nrow(destinations)
-
-  return(score_temp)
   
+  return(score_temp)
 }
 
+
 get_score2 <- function(cells_df, dest_list, total_population){
-  #cells_df <- pxlsInitial
+  # cells_df <- cells_initial_updated
   score_temp <- 0
   #dest <- dest_list$dest_code[1]
   # dest <- "cc"
@@ -98,7 +96,7 @@ get_score2 <- function(cells_df, dest_list, total_population){
     distinct(type) %>% 
     left_join(capacity_df, by = "type") %>% 
     left_join(capacity_remaining_df, by = "type") %>% 
-    mutate(unused_capacity_ratio = 100 * capacity_remaining / capacity) %>% 
+    mutate(unused_capacity_pct = 100 * capacity_remaining / capacity) %>% 
     dplyr::select(-c(capacity_remaining, capacity))
   
   # Service -----------------------------------------------------------------
@@ -111,44 +109,32 @@ get_score2 <- function(cells_df, dest_list, total_population){
   }
   
   destinations <- destinations %>% 
-    mutate(unserved_population_ratio = 
+    mutate(unserved_population_pct = 
              100 * unserved_population / total_population) %>% 
     dplyr::select(-unserved_population)
   
+  # Open destinations -------------------------------------------------------
   
+  dest_list_eno <- dest_list %>% 
+    mutate(expected_number = ceiling(total_population / pop_req)) %>% 
+    dplyr::select(type=dest_code, expected_number)
   
+  dest_list_no <- cells_distinct %>% 
+    group_by(type) %>% 
+    summarise(number_open=n()) 
   
-  # old
+  destinations <- destinations %>% 
+    left_join(dest_list_eno, by = "type") %>% 
+    left_join(dest_list_no, by = "type") %>% 
+    mutate(destination_open_pct = 
+             100*(number_open - expected_number) / expected_number ) %>% 
+    dplyr::select(-c(expected_number, number_open))
   
-  for (dest in dest_list$dest_code) {
-    tp <- cells_df %>% 
-      filter(dest_id!="NA") %>% 
-      filter(type==dest) %>% 
-      distinct(dest_id, .keep_all = T) %>% 
-      dplyr::select(paste0("pop_total_",dest)) %>% 
-      sum()
-    
-    tpr <- cells_df %>% 
-      filter(dest_id!="NA") %>% 
-      filter(type==dest) %>% 
-      distinct(dest_id, .keep_all = T) %>% 
-      dplyr::select(paste0("pop_remaining_",dest)) %>% 
-      sum()
-    
-    tpr <- ifelse(tpr==0,1,tpr)
-    
-    no_dw <- cells_df %>% 
-      filter(dest_id!="NA") %>% 
-      filter(type==dest) %>% 
-      left_join(dest_list[,c("dest_code","dest_weight")], by=c("type"="dest_code")) %>% 
-      distinct(dest_id, .keep_all = T) %>% 
-      group_by(type) %>% 
-      summarise(no=n(), dw=dest_weight)%>%
-      distinct(type, .keep_all = T) %>% 
-      transmute(no_dw=no*dw)
-    
-    score_temp <- score_temp + ((tp/tpr)+1)*no_dw$no_dw*(-1)
-  }
-  if(is.na(score_temp)) score_temp=nrow(cells_df)*-1
+  # Total Score -------------------------------------------------------------
+  
+  score_temp <- destinations %>% dplyr::select(-type) %>% sum()
+  
+  if(is.na(score_temp)) score_temp=400*nrow(destinations)
+  
   return(score_temp)
 }
