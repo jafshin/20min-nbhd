@@ -5,14 +5,9 @@
 # @author AJ
 
 # Packages ----------------------------------------------------------------
+library(tidyverse)
 library(rdist)
-library(dplyr)
-options(dplyr.summarise.inform = FALSE)
-library(ggplot2)
 library(sf)
-library(purrr)
-library(readr)
-library(stringr)
 
 # Functions ---------------------------------------------------------------
 source("./models/functions/land_updating.R")
