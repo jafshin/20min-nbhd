@@ -207,7 +207,7 @@ optimise_nbhds <- function(dph) {
   echo("Starting Scoring (step4)")
   
   if(No_Answer_flag){  
-    score_temp <- nrow(dests) * 200
+    score_temp <- nrow(dests) * 1000
   }else{
     score_temp <- get_score(cells_initial_updated, dest_list, total_population) 
     cells_best <- cells_initial_updated
@@ -333,7 +333,7 @@ optimise_nbhds <- function(dph) {
       # Step7 Evaluation --------------------------------------------------------
       # Check the Score, If better keep, if not discard
       if(No_Answer_flag){  
-        score_temp <- nrow(dests) * 200
+        score_temp <- nrow(dests) * 1000
       }else{
         score_temp <- get_score(cells_temp, dest_list, total_population) 
       }
@@ -384,7 +384,7 @@ nbhd_d <- 1.6 # neighbourhood diameter
 densities <- seq(from = 15, to = 45, by = 5) # dwelling per hectare
 runs <- 10
 experiment_time <- format(Sys.time(),"%d%b%y_%H%M")
-test_run <- T # set true if you want a small experimental run 
+test_run <- F # set true if you want a small experimental run 
 
 # Destinations
 dests <- read.csv("./inputs/destinations_v8.csv")
