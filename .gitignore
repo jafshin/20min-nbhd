@@ -5,3 +5,4 @@
 outputs/
 ./output/
 *.sqlite
+*.Rproj
