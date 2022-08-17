@@ -6,20 +6,15 @@
 # @author AJ
 
 # Packages ----------------------------------------------------------------
+library(tidyverse)
 library(rdist)
-library(dplyr)
-options(dplyr.summarise.inform = FALSE)
-library(ggplot2)
 library(sf)
-library(purrr)
-library(readr)
-library(stringr)
 
 # Functions ---------------------------------------------------------------
-source("./functions/land_updating.R")
-source("./functions/update_service.R")
-source("./functions/scoring.R")
-source("./functions/make-layout.R")
+source("./models/functions/land_updating.R")
+source("./models/functions/update_service.R")
+source("./models/functions/scoring.R")
+source("./models/functions/make-layout.R")
 
 echo<- function(msg) {
   cat(paste0(as.character(Sys.time()), ' | ', msg,"\n"))  
@@ -194,7 +189,6 @@ optimise_nbhds <- function(dph) {
         cells_initial[dest_cells_row, reminderPopCol] <- remaining_capacity
       })
     }
-    
   }
   if (discardRunFlag) {
     echo("skiping the Run")
@@ -231,7 +225,7 @@ optimise_nbhds <- function(dph) {
   echo("Starting Scoring (step4)")
   
   if(No_Answer_flag){  
-    score_temp <- nrow(cells_initial_updated)*(-1)
+    score_temp <- nrow(dest_list)*(1000)
   }else{
     score_temp <- get_score2(cells_initial_updated, dest_list, total_population) 
     cells_best <- cells_initial_updated
@@ -353,7 +347,7 @@ optimise_nbhds <- function(dph) {
       # Step7 Evaluation --------------------------------------------------------
       # Check the Score, If better keep, if not discard
       if(No_Answer_flag){  
-        score_temp <- nrow(cells_temp) * (-1)
+        score_temp <- nrow(dests) * 1000
       }else{
         score_temp <- get_score2(cells_temp, dest_list, total_population) 
       }
@@ -414,9 +408,9 @@ dests <- read.csv("./inputs/destinations_v8.csv")
 # Setting up folders ------------------------------------------------------
 
 if(test_run){
-  densities <- seq(from = 25, to = 30, by = 5)
-  runs <- 2
-  iters_max <- 3
+  densities <- seq(from = 30, to = 35, by = 5)
+  runs <- 1
+  iters_max <- 1
 }
 
 # iterating over densities ------------------------------------------------
