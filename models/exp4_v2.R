@@ -59,7 +59,8 @@ optimise_nbhds <- function(dph) {
   # Adding weights for scoring
   dests <- dests %>%
     mutate(land_for_weight = ifelse(land_req == 0, 0.008000, land_req)) %>% 
-    mutate(dest_weight = (pop_req*land_for_weight) / sum(pop_req*land_for_weight)) %>%
+    mutate(dest_weight = 
+             (pop_req * land_for_weight) / sum(pop_req * land_for_weight)) %>%
     dplyr::select(-land_for_weight)
   
   
@@ -132,7 +133,8 @@ optimise_nbhds <- function(dph) {
       cells_initial$type[dest_cells_row] <- dest_code
       
       # Setting parent ID to be whatever was there before
-      cells_initial[dest_cells_row, "parent_dest_id"] <- cells_initial$dest_id[dest_cells_row] 
+      cells_initial[dest_cells_row, 
+                    "parent_dest_id"] <- cells_initial$dest_id[dest_cells_row] 
       
       num_dests <- num_dests + 1
       # Setting the current dest ID
@@ -144,8 +146,10 @@ optimise_nbhds <- function(dph) {
       numDestCol <- paste0("num_dest_", dest_code)
       unserved_pop_col <- paste0("not_served_by_", dest_code)
       
-      cells_initial[dest_cells_row, totalPopCol] <- dest_list[dest_row, "capacity"]
-      cells_initial[dest_cells_row, reminderPopCol] <- dest_list[dest_row, "capacity"]
+      cells_initial[dest_cells_row, totalPopCol] <- dest_list[dest_row, 
+                                                              "capacity"]
+      cells_initial[dest_cells_row, reminderPopCol] <- dest_list[dest_row, 
+                                                                 "capacity"]
       cells_initial[dest_cells_row, numDestCol] <- 1
       
       # Start serving people around
@@ -158,7 +162,8 @@ optimise_nbhds <- function(dph) {
       # Getting those within 20 min access    
       cellsWithinDistRow <- dest_geom %>% 
         st_buffer(0.8) %>% 
-        st_intersects(cells_initial %>% st_as_sf(coords = c("pxl_x", "pxl_y"), remove = F)) 
+        st_intersects(cells_initial %>% st_as_sf(coords = c("pxl_x", "pxl_y"), 
+                                                 remove = F)) 
       
       cells_within_dist_id <- cells_initial[unlist(cellsWithinDistRow), ] %>% 
         st_as_sf(coords = c("pxl_x", "pxl_y"), remove = F) %>% 
@@ -172,7 +177,8 @@ optimise_nbhds <- function(dph) {
       # Serving cells 
       system.time({
         remaining_capacity <- cells_initial[dest_cells_row, reminderPopCol][1]
-        close_cells <- cells_initial[which(cells_initial$id %in% cells_within_dist_id$id), ]
+        close_cells <- 
+          cells_initial[which(cells_initial$id %in% cells_within_dist_id$id), ]
         cell <- 1
         for(cell in 1:nrow(close_cells)) {
           # cellRow <- which(cells_initial$id == id)
@@ -185,7 +191,8 @@ optimise_nbhds <- function(dph) {
             close_cells[cell, unserved_pop_col] <- cell_unsrved_pop - pop2cover
           }
         }
-        cells_initial[which(cells_initial$id %in% cells_within_dist_id$id), ] <- close_cells
+        cells_initial[which(cells_initial$id %in% cells_within_dist_id$id), ] <- 
+          close_cells
         cells_initial[dest_cells_row, reminderPopCol] <- remaining_capacity
       })
     }
@@ -323,7 +330,9 @@ optimise_nbhds <- function(dph) {
                                                 dest_to_update_type)
         
         # Evaluating the mutation
-        score_post_mutation <- get_score2(cells_mutation, dest_list, total_population) 
+        score_post_mutation <- get_score2(cells_mutation, dest_list, 
+                                          total_population) 
+        
         if (score_post_mutation < score_temp) {
           # Keeping the mutation result
           echo(paste0("Found a good mutation, destintation id = ", 
@@ -364,7 +373,8 @@ optimise_nbhds <- function(dph) {
       }
       echo("******, ******")
       if(convergence_counter > convergence_iterations){
-        echo(paste0("Skipping the rest, model seems to be converged at iter ", iter))
+        echo(paste0("Skipping the rest, model seems to be converged at iter ", 
+                    iter))
         break
       } 
       echo(paste0("Iteration: ", iter, "Finished, DPH: ", dph))

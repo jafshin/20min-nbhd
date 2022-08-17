@@ -115,10 +115,11 @@ optimise_nbhds <- function(dph) {
       cells_initial$type[dest_cells_row] <- dest_code
       remaining_num_dests <- remaining_num_dests - 1
       # Setting parent ID to be whatever was there before
-      cells_initial[dest_cells_row, "parent_dest_id"] <- cells_initial$dest_id[dest_cells_row] 
+      cells_initial[dest_cells_row, "parent_dest_id"] <- 
+        cells_initial$dest_id[dest_cells_row] 
       # Setting the current dest ID
-      cells_initial$dest_id[dest_cells_row] <- paste0(dest_code,"_",
-                                                      dest_list$num_dests[dest_row] - remaining_num_dests)
+      cells_initial$dest_id[dest_cells_row] <- 
+        paste0(dest_code,"_", dest_list$num_dests[dest_row] - remaining_num_dests)
       
       # Adding new capacity
       reminderPopCol <- paste0("pop_remaining_",dest_code)
@@ -126,9 +127,11 @@ optimise_nbhds <- function(dph) {
       numDestCol <- paste0("num_dest_",dest_code)
       unserved_pop_col <- paste0("not_served_by_",dest_code)
       
-      cells_initial[dest_cells_row,totalPopCol] <- dest_list[dest_row,"capacity"]
-      cells_initial[dest_cells_row,reminderPopCol] <- dest_list[dest_row,"capacity"]
-      cells_initial[dest_cells_row,numDestCol] <- 1
+      cells_initial[dest_cells_row, totalPopCol] <- dest_list[dest_row,
+                                                             "capacity"]
+      cells_initial[dest_cells_row, reminderPopCol] <- dest_list[dest_row,
+                                                                "capacity"]
+      cells_initial[dest_cells_row, numDestCol] <- 1
       # Start serving people around
       dest_geom <- cells_initial %>% 
         filter(id %in% dest_cells_id) %>% 
@@ -306,7 +309,9 @@ optimise_nbhds <- function(dph) {
                                                 dest_to_update_type)
         
         # Evaluating the single destination mutation
-        score_post_mutation <- get_score(cells_mutation, dest_list, total_population) 
+        score_post_mutation <- get_score(cells_mutation, dest_list, 
+                                         total_population) 
+        
         if (score_post_mutation < score_temp) {
           #   # Keeping the mutation result
           echo(paste0("Found a good mutation, destintation id= ", 
