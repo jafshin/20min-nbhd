@@ -34,6 +34,18 @@ findSpace <- function(cells_temp,dest_code, cells_to_occupy, dest_lvl){
       arrange(desc(area_catchment_potential)) 
   }
 
+  if(nrow(feasible_area)==0){
+    echo("increasing destination space to 70%")
+    feasible_area <- cells_temp_grouped %>% 
+      mutate(wt=ifelse(type=="resid",yes = 0,no=1)) %>% 
+      summarise(area_catchment_potential = sum(.data[[paste0("not_served_by_", dest_code)]]),
+                cells=n(),
+                cells_with_dest=sum(wt)) %>% 
+      filter(cells_to_occupy+cells_with_dest<0.7*cells) %>% # Making sure there is enough space
+      filter(area_catchment_potential>0) %>% 
+      arrange(desc(area_catchment_potential)) 
+  }
+  
   has_space <- T
   if (nrow(feasible_area)==0){
     discardRunFlag <<- T 
@@ -83,6 +95,18 @@ findDestinationCells <- function(cells_temp,dest_list,cells_to_occupy,
                 cells=n(),
                 cells_with_dest=sum(wt)) %>% 
       filter(cells_to_occupy+cells_with_dest<0.5*cells) %>% # Making sure there is enough space
+      filter(area_catchment_potential>0) %>% 
+      arrange(desc(area_catchment_potential)) 
+  }
+
+  if(nrow(feasible_area)==0){
+    echo("increasing destination space to 70%")
+    feasible_area <- cells_temp_grouped %>% 
+      mutate(wt=ifelse(type=="resid",yes = 0,no=1)) %>% 
+      summarise(area_catchment_potential = sum(.data[[paste0("not_served_by_", dest_code)]]),
+                cells=n(),
+                cells_with_dest=sum(wt)) %>% 
+      filter(cells_to_occupy+cells_with_dest<0.7*cells) %>% # Making sure there is enough space
       filter(area_catchment_potential>0) %>% 
       arrange(desc(area_catchment_potential)) 
   }
