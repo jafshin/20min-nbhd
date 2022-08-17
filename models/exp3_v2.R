@@ -417,7 +417,7 @@ for (dph in densities){
     total_scores_file <- paste0(output_dir, "score_summary_Run", run, ".csv")
     total_score_df <- data.frame(density = densities)
     
-    output_sqlite <- paste0(output_deci_dir, "/pxls_dph", dph, "_run", run, ".sqlite")
+    output_sqlite <- paste0(output_deci_dir, "/cells_dph", dph, ".sqlite")
     
     optimise_nbhds(dph)
   }
