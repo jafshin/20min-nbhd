@@ -4,8 +4,8 @@
 # no= number opened; uc= unused capacity (%); usp= un-serviced population (%)
 
 process_layout <- function(output_dir,dph){
-  output_dir <- "./outputs/Aug2022/Exp3_01Aug22_1827/"
-  # dph <- 15
+  # output_dir <- "./outputs/exp4/"
+  # dph <- 35
   # cells <- read_sf(paste0(output_dir,"pxls_dph35_run1.sqlite"),
   #                  layer="35_final") %>%
   #   st_drop_geometry()

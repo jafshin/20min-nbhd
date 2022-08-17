@@ -10,7 +10,7 @@ destinations <- read_csv("./inputs/destinations_v8.csv") %>%
 
 # Experiment three
 destinations_exp3 <- destinations
-output_dir <- "./outputs/Aug2022/Exp3_01Aug22_1827/"
+output_dir <- "./outputs/exp3/"
 #dph <- 15
 
 for (dph in seq(15, 45, 5)) {
@@ -19,9 +19,11 @@ for (dph in seq(15, 45, 5)) {
     left_join(df, by = "type")
 }
 
+write_csv(destinations_exp3, "experiment3_summary.csv")
+
 # Experiment four
 destinations_exp4 <- destinations
-output_dir <- "./outputs/Aug2022/Exp4_01Aug22_1827/"
+output_dir <- "./outputs/exp4/"
 #dph <- 15
 
 for (dph in seq(15, 45, 5)) {
@@ -30,24 +32,6 @@ for (dph in seq(15, 45, 5)) {
     left_join(df, by = "type")
 }
 
-source("./models/functions/land_updating.R")
+write_csv(destinations_exp4, "experiment4_summary.csv")
 
-stwo35 <- read_sf("./outputs/Aug2022/Exp3_01Aug22_1827/pxls_dph35.sqlite", layer="35_step2") %>% 
-  st_drop_geometry()
-get_unsrvd_pop(stwo35, dest_code = "occ")
-
-60000*(1-destinations$coverage[13])
-
-sthree35 <- read_sf("./outputs/Aug2022/Exp3_01Aug22_1827/pxls_dph35.sqlite", layer="35_step3") %>% 
-  st_drop_geometry()
-
-get_unsrvd_pop(sthree35, dest_code = "occ")
-
-sfinal35 <- read_sf("./outputs/Aug2022/Exp3_01Aug22_1827/pxls_dph35.sqlite", layer="35_final") %>% 
-  st_drop_geometry()
-get_unsrvd_pop(sfinal35, dest_code = "occ")
-
-sfinal35$not_served_by_occ %>% sum()
-
-sfinal35$pxl_pop %>% sum()
 
